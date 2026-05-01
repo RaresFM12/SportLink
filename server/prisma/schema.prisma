@@ -1,0 +1,71 @@
+// This file is the single source of truth for the database schema.
+// Run `npx prisma migrate dev` to generate and apply migrations automatically.
+// Never edit the database manually.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Event ────────────────────────────────────────────────────────────────────
+// 3NF proof:
+//   - Every non-key attribute (title, sport, city, date, startTime, duration,
+//     location, maxParticipants, description) depends only on the primary key id.
+//   - No transitive dependencies: sport, city, location are stored as plain
+//     strings (denormalised for simplicity); if sport needed extra attributes
+//     (e.g. teamSize) it would be extracted to its own table — but it doesn't.
+//   - participants is extracted to its own Participant table (see below),
+//     eliminating the repeating group that existed in the in-memory model.
+//   - currentParticipants is a derived value (_count of participants) and is
+//     NOT stored — it is computed at query time to avoid update anomalies.
+model Event {
+  id              Int           @id @default(autoincrement())
+  title           String
+  sport           String
+  city            String
+  date            String        // stored as YYYY-MM-DD string to match domain type
+  startTime       String        // stored as HH:mm string
+  duration        String
+  location        String
+  maxParticipants Int
+  description     String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  participants    Participant[]
+  comments        Comment[]
+}
+
+// ─── Participant ──────────────────────────────────────────────────────────────
+// Extracted from the string[] on EventItem.
+// 3NF: userName depends only on (eventId, userName) — the composite PK.
+// This eliminates the repeating group and allows efficient filtering by user.
+model Participant {
+  id        Int    @id @default(autoincrement())
+  eventId   Int
+  userName  String
+
+  event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userName])  // a user can only join an event once
+  @@index([userName])            // fast lookup for joinedOnly filter
+}
+
+// ─── Comment ─────────────────────────────────────────────────────────────────
+// 3NF: author, content, createdAt depend only on id.
+// eventId is the FK establishing the 1-to-many Event → Comment relationship.
+model Comment {
+  id        Int      @id @default(autoincrement())
+  eventId   Int
+  author    String
+  content   String
+  createdAt DateTime @default(now())
+
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])  // fast lookup for getByEventId
+}
