@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -94,20 +94,11 @@ export function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 rounded-lg bg-gray-50 border border-gray-200 p-4 text-sm text-gray-600">
-            <p className="font-medium mb-2">Demo accounts:</p>
-            <p>
-              <span className="font-mono font-semibold">admin</span> / admin123
-              — full access
-            </p>
-            <p>
-              <span className="font-mono font-semibold">rares</span> / rares123
-              — standard user
-            </p>
-            <p>
-              <span className="font-mono font-semibold">alex</span> / alex123 —
-              standard user
-            </p>
+          <div className="mt-4 text-center text-sm">
+            Don't have an account?{" "}
+            <Link to="/register" className="text-blue-600 hover:underline">
+              Register here
+            </Link>
           </div>
         </CardContent>
       </Card>

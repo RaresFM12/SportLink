@@ -10,8 +10,8 @@ export function RegisterPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock registration - redirect to events page
-    navigate("/events");
+    // Registration persistence is not implemented yet.
+    navigate("/login");
   };
 
   return (

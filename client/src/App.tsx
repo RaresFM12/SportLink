@@ -3,7 +3,9 @@ import { AuthProvider } from './context/AuthContext';
 import { EventsProvider } from './context/EventsContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { MainLayout } from './components/MainLayout';
+import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
 import { EventsListPage } from './pages/EventsListPage';
 import { EventDetailsSophisticatedPage } from './pages/EventDetailPage';
 import { CreateEventPage } from './pages/CreateEventPage';
@@ -17,8 +19,10 @@ export default function App() {
       <AuthProvider>
         <EventsProvider>
           <Routes>
-            {/* Public route */}
+            {/* Public routes */}
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
 
             {/* All authenticated routes use MainLayout */}
             <Route
@@ -28,7 +32,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/events" replace />} />
               <Route path="/events" element={<EventsListPage />} />
               <Route path="/events/new" element={<CreateEventPage />} />
               <Route path="/events/:id" element={<EventDetailsSophisticatedPage />} />
@@ -39,7 +42,7 @@ export default function App() {
             </Route>
 
             {/* Fallback */}
-            <Route path="*" element={<Navigate to="/events" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </EventsProvider>
       </AuthProvider>
