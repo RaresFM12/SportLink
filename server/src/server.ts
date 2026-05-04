@@ -19,10 +19,30 @@ async function main(): Promise<void> {
   const httpServer = http.createServer(app);
 
   // Generator WebSocket
-  initializeWebSocketServer(httpServer);
+  const generatorWss = initializeWebSocketServer();
 
   // Chat WebSocket
-  initializeChatWebSocketServer(httpServer, sessionMiddleware);
+  const chatWss = initializeChatWebSocketServer(sessionMiddleware);
+
+  httpServer.on('upgrade', (req, socket, head) => {
+    const { pathname } = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+
+    if (pathname === '/ws') {
+      generatorWss.handleUpgrade(req, socket, head, (ws) => {
+        generatorWss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    if (pathname === '/ws/chat') {
+      chatWss.handleUpgrade(req, socket, head, (ws) => {
+        chatWss.emit('connection', ws, req);
+      });
+      return;
+    }
+
+    socket.destroy();
+  });
 
   httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`SportLink server     → http://0.0.0.0:${PORT}`);

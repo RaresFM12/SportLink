@@ -1,5 +1,4 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import type { Server as HttpServer } from 'http';
 
 type GeneratorBroadcastMessage =
   | {
@@ -24,11 +23,8 @@ function sendToClient(client: WebSocket, message: GeneratorBroadcastMessage): vo
   }
 }
 
-export function initializeWebSocketServer(httpServer: HttpServer): WebSocketServer {
-  webSocketServer = new WebSocketServer({
-    server: httpServer,
-    path: '/ws'
-  });
+export function initializeWebSocketServer(): WebSocketServer {
+  webSocketServer = new WebSocketServer({ noServer: true });
 
   webSocketServer.on('connection', (socket) => {
     sendToClient(socket, {

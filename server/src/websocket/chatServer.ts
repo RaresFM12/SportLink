@@ -1,5 +1,4 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import type { Server as HttpServer } from 'http';
 import type { IncomingMessage } from 'http';
 import session from 'express-session';
 import { chatService } from '../services/chatService.js';
@@ -119,10 +118,9 @@ async function resolveUser(
 }
 
 export function initializeChatWebSocketServer(
-  httpServer: HttpServer,
   sessionMiddleware: ReturnType<typeof session>
 ): WebSocketServer {
-  chatWss = new WebSocketServer({ server: httpServer, path: '/ws/chat' });
+  chatWss = new WebSocketServer({ noServer: true });
 
   chatWss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     console.log('[chat] New connection, url:', req.url);
