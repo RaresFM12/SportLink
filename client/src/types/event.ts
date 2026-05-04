@@ -1,5 +1,7 @@
 export type EventItem = {
   id: number;
+  createdByUserId?: number | null;
+  createdByDisplayName?: string | null;
   title: string;
   sport: string;
   city: string;

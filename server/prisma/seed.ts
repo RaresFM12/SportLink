@@ -101,6 +101,7 @@ async function main() {
   // ── Events ────────────────────────────────────────────────────────────────
   const football = await prisma.event.create({
     data: {
+      createdByUserId: rares.id,
       title: 'Football Meetup',
       sport: 'Football',
       city: 'Bucharest',
@@ -118,6 +119,7 @@ async function main() {
 
   const basketball = await prisma.event.create({
     data: {
+      createdByUserId: alex.id,
       title: 'Basketball Session',
       sport: 'Basketball',
       city: 'Cluj-Napoca',

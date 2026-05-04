@@ -3,6 +3,7 @@ import type { IncomingMessage } from 'http';
 import session from 'express-session';
 import { chatService } from '../services/chatService.js';
 import type { SessionUser } from '../services/authService.js';
+import { securityLogService } from '../services/securityLogService.js';
 import '../middleware/requireAuth.js';
 
 type ChatClient = {
@@ -146,6 +147,7 @@ export function initializeChatWebSocketServer(
 
         console.log('[chat] Accepted:', sessionUser.username);
         clients.set(ws, { ws, user: sessionUser });
+        void securityLogService.logUserAction(sessionUser, 'Opened live chat connection');
 
         // Send history
         try {
@@ -179,6 +181,9 @@ export function initializeChatWebSocketServer(
               }
 
               const saved = await chatService.saveMessage(sessionUser, parsed.text);
+              void securityLogService.logUserAction(sessionUser, 'Sent live chat message', {
+                messageId: saved._id?.toString(),
+              });
               const outgoing: OutgoingChatMessage = {
                 type: 'chat',
                 userId: saved.userId,

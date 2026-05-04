@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
-import { Plus, User, MessageSquare, LogOut, Shield } from "lucide-react";
+import { Plus, User, MessageSquare, LogOut, Shield, ShieldAlert } from "lucide-react";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -56,6 +56,7 @@ export function MainLayout() {
                 {navLink("/events", "Events")}
                 {navLink("/my-events", "My Events")}
                 {navLink("/statistics", "Statistics")}
+                {user?.role === "ADMIN" && navLink("/security", "Security")}
 
                 {/* Chat link */}
                 <Link
@@ -125,6 +126,12 @@ export function MainLayout() {
                     <MessageSquare className="h-4 w-4 mr-2" />
                     Chat
                   </DropdownMenuItem>
+                  {user?.role === "ADMIN" && (
+                    <DropdownMenuItem onClick={() => navigate('/security')}>
+                      <ShieldAlert className="h-4 w-4 mr-2" />
+                      Security
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     onClick={() => void handleLogout()}
                     className="text-red-600 focus:text-red-600"

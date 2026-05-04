@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { SessionUser } from '../services/authService.js';
+import { securityLogService } from '../services/securityLogService.js';
 
 // Extend the Express session with our user type.
 // We augment the express-session SessionData interface here so TypeScript
@@ -29,6 +30,13 @@ export function requirePermission(action: string) {
       return;
     }
     if (!user.permissions.includes(action)) {
+      void securityLogService.markSuspicious(
+        user,
+        `Permission denied for ${action}`,
+        `${req.method} ${req.originalUrl}`
+      ).catch((err) => {
+        console.error('[security-log] Failed to mark suspicious user:', err);
+      });
       res.status(403).json({ message: `Permission denied: ${action}` });
       return;
     }
@@ -43,6 +51,13 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
     return;
   }
   if (user.role !== 'ADMIN') {
+    void securityLogService.markSuspicious(
+      user,
+      'Attempted to access admin-only area',
+      `${req.method} ${req.originalUrl}`
+    ).catch((err) => {
+      console.error('[security-log] Failed to mark suspicious user:', err);
+    });
     res.status(403).json({ message: 'Admin access required.' });
     return;
   }

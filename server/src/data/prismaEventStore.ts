@@ -10,6 +10,8 @@ import type {
 // ─── shape returned by Prisma when we include participants ────────────────────
 type EventWithParticipants = {
   id: number;
+  createdByUserId: number | null;
+  createdBy?: { displayName: string } | null;
   title: string;
   sport: string;
   city: string;
@@ -28,6 +30,8 @@ function toEventItem(row: EventWithParticipants): EventItem {
   const participantNames = row.participants.map((p) => p.userName);
   return {
     id: row.id,
+    createdByUserId: row.createdByUserId,
+    createdByDisplayName: row.createdBy?.displayName ?? null,
     title: row.title,
     sport: row.sport,
     city: row.city,
@@ -43,7 +47,10 @@ function toEventItem(row: EventWithParticipants): EventItem {
 }
 
 // Shared include clause so every query fetches participants consistently.
-const includeParticipants = { participants: { select: { userName: true } } } as const;
+const includeEventRelations = {
+  participants: { select: { userName: true } },
+  createdBy: { select: { displayName: true } },
+} as const;
 
 // ─── Build a Prisma WHERE clause from EventFilters ────────────────────────────
 function buildWhere(filters: EventFilters) {
@@ -61,6 +68,7 @@ function buildWhere(filters: EventFilters) {
     ...(filters.joinedOnly && filters.user
       ? { participants: { some: { userName: filters.user } } }
       : {}),
+    ...(filters.createdByUserId ? { createdByUserId: filters.createdByUserId } : {}),
   };
 }
 
@@ -77,7 +85,7 @@ export const prismaEventStore = {
       prisma.event.count({ where }),
       prisma.event.findMany({
         where,
-        include: includeParticipants,
+        include: includeEventRelations,
         orderBy: { id: 'asc' },
         skip: (page - 1) * limit,
         take: limit,
@@ -98,14 +106,15 @@ export const prismaEventStore = {
   async getById(id: number): Promise<EventItem | null> {
     const row = await prisma.event.findUnique({
       where: { id },
-      include: includeParticipants,
+      include: includeEventRelations,
     });
     return row ? toEventItem(row) : null;
   },
 
-  async create(data: CreateEventInput): Promise<EventItem> {
+  async create(data: CreateEventInput, createdByUserId?: number): Promise<EventItem> {
     const row = await prisma.event.create({
       data: {
+        createdByUserId,
         title: data.title,
         sport: data.sport,
         city: data.city,
@@ -119,7 +128,7 @@ export const prismaEventStore = {
           create: data.participants.map((userName) => ({ userName })),
         },
       },
-      include: includeParticipants,
+      include: includeEventRelations,
     });
     return toEventItem(row);
   },
@@ -148,7 +157,7 @@ export const prismaEventStore = {
             }
           : {}),
       },
-      include: includeParticipants,
+      include: includeEventRelations,
     });
     return toEventItem(row);
   },

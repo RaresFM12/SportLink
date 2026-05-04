@@ -8,6 +8,12 @@ import type {
   UpdateEventInput,
 } from '../types/event.js';
 import { HttpError } from '../utils/httpErrors.js';
+import type { SessionUser } from './authService.js';
+import { securityLogService } from './securityLogService.js';
+
+function canManageEvent(user: SessionUser, event: EventItem): boolean {
+  return user.role === 'ADMIN' || event.createdByUserId === user.id;
+}
 
 export const eventService = {
   async getAll(
@@ -23,13 +29,21 @@ export const eventService = {
     return event;
   },
 
-  async create(data: CreateEventInput): Promise<EventItem> {
-    return prismaEventStore.create(data);
+  async create(data: CreateEventInput, user?: SessionUser): Promise<EventItem> {
+    return prismaEventStore.create(data, user?.id);
   },
 
-  async update(id: number, updatedFields: UpdateEventInput): Promise<EventItem> {
+  async update(id: number, updatedFields: UpdateEventInput, user?: SessionUser): Promise<EventItem> {
     const existing = await prismaEventStore.getById(id);
     if (!existing) throw new HttpError(404, 'Event not found.');
+    if (user && !canManageEvent(user, existing)) {
+      void securityLogService.markSuspicious(
+        user,
+        'Attempted to edit an event owned by another user',
+        `Restricted event update attempt: event ${id}`
+      ).catch((err) => console.error('[security-log] Failed to mark event edit attempt:', err));
+      throw new HttpError(403, 'You can only edit events created by you.');
+    }
 
     const nextParticipants = updatedFields.participants ?? existing.participants;
     const nextMaxParticipants = updatedFields.maxParticipants ?? existing.maxParticipants;
@@ -47,9 +61,17 @@ export const eventService = {
     return updated;
   },
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, user?: SessionUser): Promise<void> {
     const existing = await prismaEventStore.getById(id);
     if (!existing) throw new HttpError(404, 'Event not found.');
+    if (user && !canManageEvent(user, existing)) {
+      void securityLogService.markSuspicious(
+        user,
+        'Attempted to delete an event owned by another user',
+        `Restricted event delete attempt: event ${id}`
+      ).catch((err) => console.error('[security-log] Failed to mark event delete attempt:', err));
+      throw new HttpError(403, 'You can only delete events created by you.');
+    }
     await prismaEventStore.remove(id);
   },
 

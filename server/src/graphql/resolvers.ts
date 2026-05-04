@@ -6,12 +6,32 @@ import { commentService } from '../services/commentService.js';
 import { validateCreateEventInput, validateUpdateEventInput } from '../validators/eventValidator.js';
 import { HttpError } from '../utils/httpErrors.js';
 import type { EventItem } from '../types/event.js';
+import type { GraphQLContext } from './server.js';
+import { securityLogService } from '../services/securityLogService.js';
+
+function requirePermission(ctx: GraphQLContext, action: string): void {
+  if (!ctx.user) {
+    throw new GraphQLError('Not authenticated.', { extensions: { code: 'UNAUTHENTICATED' } });
+  }
+
+  if (!ctx.user.permissions.includes(action)) {
+    void securityLogService.markSuspicious(
+      ctx.user,
+      `GraphQL permission denied for ${action}`,
+      `GraphQL ${action}`
+    ).catch((err) => {
+      console.error('[security-log] Failed to mark GraphQL suspicious user:', err);
+    });
+    throw new GraphQLError(`Permission denied: ${action}`, { extensions: { code: 'FORBIDDEN' } });
+  }
+}
 
 function toGraphQLError(err: unknown): never {
   if (err instanceof HttpError) {
     const code =
       err.statusCode === 404 ? 'NOT_FOUND'
       : err.statusCode === 409 ? 'CONFLICT'
+      : err.statusCode === 403 ? 'FORBIDDEN'
       : 'BAD_USER_INPUT';
     throw new GraphQLError(err.message, { extensions: { code } });
   }
@@ -33,8 +53,11 @@ export const resolvers = {
         location?: string;
         joinedOnly?: boolean;
         user?: string;
-      }
+        createdByUserId?: number;
+      },
+      ctx: GraphQLContext
     ) {
+      requirePermission(ctx, 'event:read');
       try {
         return await eventService.getAll(
           {
@@ -43,6 +66,7 @@ export const resolvers = {
             location: args.location,
             joinedOnly: args.joinedOnly ?? false,
             user: args.user,
+            createdByUserId: args.createdByUserId,
           },
           {
             page: args.page && args.page > 0 ? args.page : 1,
@@ -54,7 +78,8 @@ export const resolvers = {
       }
     },
 
-    async event(_: unknown, args: { id: number }) {
+    async event(_: unknown, args: { id: number }, ctx: GraphQLContext) {
+      requirePermission(ctx, 'event:read');
       try {
         return await eventService.getById(args.id);
       } catch (err) {
@@ -63,7 +88,8 @@ export const resolvers = {
       }
     },
 
-    async statistics() {
+    async statistics(_: unknown, _args: unknown, ctx: GraphQLContext) {
+      requirePermission(ctx, 'statistics:read');
       try {
         return await statisticsService.getStatistics();
       } catch (err) {
@@ -71,11 +97,13 @@ export const resolvers = {
       }
     },
 
-    generatorStatus() {
+    generatorStatus(_: unknown, _args: unknown, ctx: GraphQLContext) {
+      requirePermission(ctx, 'statistics:read');
       return generatorService.getStatus();
     },
 
-    async commentsByEvent(_: unknown, args: { eventId: number }) {
+    async commentsByEvent(_: unknown, args: { eventId: number }, ctx: GraphQLContext) {
+      requirePermission(ctx, 'event:read');
       try {
         return await commentService.getByEventId(args.eventId);
       } catch (err) {
@@ -85,37 +113,42 @@ export const resolvers = {
   },
 
   Mutation: {
-    async createEvent(_: unknown, args: { input: unknown }) {
+    async createEvent(_: unknown, args: { input: unknown }, ctx: GraphQLContext) {
+      requirePermission(ctx, 'event:create');
       try {
         validateCreateEventInput(args.input);
-        return await eventService.create(args.input);
+        return await eventService.create(args.input, ctx.user);
       } catch (err) {
         toGraphQLError(err);
       }
     },
 
-    async updateEvent(_: unknown, args: { id: number; input: unknown }) {
+    async updateEvent(_: unknown, args: { id: number; input: unknown }, ctx: GraphQLContext) {
+      requirePermission(ctx, 'event:update');
       try {
         validateUpdateEventInput(args.input);
         return await eventService.update(
           args.id,
-          args.input as Parameters<typeof eventService.update>[1]
+          args.input as Parameters<typeof eventService.update>[1],
+          ctx.user
         );
       } catch (err) {
         toGraphQLError(err);
       }
     },
 
-    async deleteEvent(_: unknown, args: { id: number }) {
+    async deleteEvent(_: unknown, args: { id: number }, ctx: GraphQLContext) {
+      requirePermission(ctx, 'event:delete');
       try {
-        await eventService.remove(args.id);
+        await eventService.remove(args.id, ctx.user);
         return true;
       } catch (err) {
         toGraphQLError(err);
       }
     },
 
-    async joinEvent(_: unknown, args: { id: number; userName: string }) {
+    async joinEvent(_: unknown, args: { id: number; userName: string }, ctx: GraphQLContext) {
+      requirePermission(ctx, 'event:join');
       try {
         return await eventService.join(args.id, args.userName);
       } catch (err) {
@@ -123,7 +156,8 @@ export const resolvers = {
       }
     },
 
-    async leaveEvent(_: unknown, args: { id: number; userName: string }) {
+    async leaveEvent(_: unknown, args: { id: number; userName: string }, ctx: GraphQLContext) {
+      requirePermission(ctx, 'event:leave');
       try {
         return await eventService.leave(args.id, args.userName);
       } catch (err) {
@@ -131,18 +165,22 @@ export const resolvers = {
       }
     },
 
-    startGenerator(_: unknown, args: { batchSize?: number; intervalMs?: number }) {
+    startGenerator(_: unknown, args: { batchSize?: number; intervalMs?: number }, ctx: GraphQLContext) {
+      requirePermission(ctx, 'generator:start');
       return generatorService.start(args.batchSize ?? 3, args.intervalMs ?? 4000);
     },
 
-    stopGenerator() {
+    stopGenerator(_: unknown, _args: unknown, ctx: GraphQLContext) {
+      requirePermission(ctx, 'generator:stop');
       return generatorService.stop();
     },
 
     async createComment(
       _: unknown,
-      args: { input: { eventId: number; author: string; content: string } }
+      args: { input: { eventId: number; author: string; content: string } },
+      ctx: GraphQLContext
     ) {
+      requirePermission(ctx, 'comment:create');
       try {
         return await commentService.create(args.input);
       } catch (err) {
@@ -150,7 +188,12 @@ export const resolvers = {
       }
     },
 
-    async updateComment(_: unknown, args: { id: number; input: { content: string } }) {
+    async updateComment(
+      _: unknown,
+      args: { id: number; input: { content: string } },
+      ctx: GraphQLContext
+    ) {
+      requirePermission(ctx, 'comment:update');
       try {
         return await commentService.update(args.id, args.input);
       } catch (err) {
@@ -158,7 +201,8 @@ export const resolvers = {
       }
     },
 
-    async deleteComment(_: unknown, args: { id: number }) {
+    async deleteComment(_: unknown, args: { id: number }, ctx: GraphQLContext) {
+      requirePermission(ctx, 'comment:delete');
       try {
         await commentService.remove(args.id);
         return true;

@@ -12,6 +12,7 @@ import { CreateEventPage } from './pages/CreateEventPage';
 import { EditEventPage } from './pages/EditEventPage';
 import { StatisticsPage } from './pages/StatisticsPage';
 import { ChatPage } from './pages/ChatPage';
+import { SecurityPage } from './pages/SecurityPage';
 
 export default function App() {
   return (
@@ -39,6 +40,14 @@ export default function App() {
               <Route path="/my-events" element={<EventsListPage />} />
               <Route path="/statistics" element={<StatisticsPage />} />
               <Route path="/chat" element={<ChatPage />} />
+              <Route
+                path="/security"
+                element={
+                  <ProtectedRoute requireAdmin>
+                    <SecurityPage />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
 
             {/* Fallback */}

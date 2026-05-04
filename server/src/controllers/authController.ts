@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/authService.js';
+import { securityLogService } from '../services/securityLogService.js';
 
 export const authController = {
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -20,6 +21,16 @@ export const authController = {
   },
 
   logout(req: Request, res: Response, next: NextFunction): void {
+    const user = req.session.user;
+    if (user) {
+      void securityLogService.logAction({
+        req,
+        user,
+        statusCode: 200,
+        actionInformation: 'POST /api/auth/logout',
+      });
+    }
+
     req.session.destroy((err) => {
       if (err) return next(err);
       res.clearCookie('connect.sid');

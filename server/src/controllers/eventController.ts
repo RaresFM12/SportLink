@@ -30,7 +30,8 @@ export const eventController = {
         date: req.query.date as string | undefined,
         location: req.query.location as string | undefined,
         joinedOnly: req.query.joinedOnly === 'true',
-        user: req.query.user as string | undefined
+        user: req.query.user as string | undefined,
+        createdByUserId: req.query.createdByUserId ? Number(req.query.createdByUserId) : undefined,
       };
 
       const result = eventService.getAll(filters, pagination);
@@ -52,7 +53,7 @@ export const eventController = {
   create(req: Request, res: Response, next: NextFunction): void {
     try {
       validateCreateEventInput(req.body);
-      const event = eventService.create(req.body);
+      const event = eventService.create(req.body, req.session.user);
       res.status(201).json(event);
     } catch (error) {
       next(error);
@@ -62,7 +63,7 @@ export const eventController = {
   update(req: Request, res: Response, next: NextFunction): void {
     try {
       validateUpdateEventInput(req.body);
-      const event = eventService.update(parseEventId(req.params.id), req.body);
+      const event = eventService.update(parseEventId(req.params.id), req.body, req.session.user);
       res.status(200).json(event);
     } catch (error) {
       next(error);
@@ -71,7 +72,7 @@ export const eventController = {
 
   remove(req: Request, res: Response, next: NextFunction): void {
     try {
-      eventService.remove(parseEventId(req.params.id));
+      eventService.remove(parseEventId(req.params.id), req.session.user);
       res.status(204).send();
     } catch (error) {
       next(error);

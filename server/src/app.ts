@@ -6,7 +6,9 @@ import { statisticsRoutes } from './routes/statisticsRoutes.js';
 import { generatorRoutes } from './routes/generatorRoutes.js';
 import { authRoutes } from './routes/authRoutes.js';
 import { chatRoutes } from './routes/chatRoutes.js';
+import { securityRoutes } from './routes/securityRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { actionLogger } from './middleware/actionLogger.js';
 import { applyGraphQLMiddleware } from './graphql/server.js';
 
 export type SessionStore = session.Store;
@@ -43,6 +45,7 @@ app.options('*', cors({
 
 app.use(express.json());
 app.use(sessionMiddleware);
+app.use(actionLogger);
 
 app.use((req, _res, next) => {
   if (req.path.startsWith('/api/auth')) {
@@ -60,6 +63,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/generator', generatorRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/security', securityRoutes);
 
 export async function configureApp(): Promise<typeof app> {
   await applyGraphQLMiddleware(app);

@@ -1,5 +1,7 @@
 export interface EventItem {
   id: number;
+  createdByUserId?: number | null;
+  createdByDisplayName?: string | null;
   title: string;
   sport: string;
   city: string;
@@ -25,6 +27,7 @@ export interface EventFilters {
   location?: string;
   joinedOnly?: boolean;
   user?: string;
+  createdByUserId?: number;
 }
 
 export interface PaginationParams {

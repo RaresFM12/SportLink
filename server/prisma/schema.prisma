@@ -10,6 +10,7 @@ datasource db {
 // ─── Event ────────────────────────────────────────────────────────────────────
 model Event {
   id              Int           @id @default(autoincrement())
+  createdByUserId Int?
   title           String
   sport           String
   city            String
@@ -24,6 +25,9 @@ model Event {
 
   participants    Participant[]
   comments        Comment[]
+  createdBy       User?         @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdByUserId])
 }
 
 // ─── Participant ──────────────────────────────────────────────────────────────
@@ -97,6 +101,9 @@ model User {
   createdAt    DateTime   @default(now())
 
   userRoles    UserRole[]
+  actionLogs   ActionLog[]
+  observation  ObservationUser?
+  createdEvents Event[]
 }
 
 // ─── UserRole (junction: User ↔ Role) ────────────────────────────────────────
@@ -110,4 +117,45 @@ model UserRole {
   role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
+}
+
+// Log table for every HTTP action completed by a logged-in user.
+// GROUP_ID from the challenge is represented by the user's role name at action time.
+model ActionLog {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  groupId           String
+  actionInformation String
+  method            String
+  path              String
+  statusCode        Int
+  ipAddress         String?
+  userAgent         String?
+  metadata          Json?
+  createdAt         DateTime @default(now())
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([groupId, createdAt])
+  @@index([statusCode, createdAt])
+}
+
+// Admin-visible watch list populated by the suspicious-behaviour detector.
+model ObservationUser {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique
+  groupId        String
+  reason         String
+  suspicionScore Int      @default(0)
+  lastActionInfo String
+  lastActionAt   DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([suspicionScore])
+  @@index([lastActionAt])
 }

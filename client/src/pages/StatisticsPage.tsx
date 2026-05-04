@@ -23,6 +23,7 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { useEvents } from "../context/EventsContext";
+import { useAuth } from "../context/AuthContext";
 import { usePageTracking } from "../hooks/usePageTracking";
 import { motion } from "framer-motion";
 
@@ -40,6 +41,8 @@ export function StatisticsPage() {
   } = useEvents();
 
   const [generatorActionLoading, setGeneratorActionLoading] = useState(false);
+  const { hasPermission } = useAuth();
+  const canControlGenerator = hasPermission("generator:start") || hasPermission("generator:stop");
 
   useEffect(() => {
     fetchStatistics().catch(() => undefined);
@@ -106,21 +109,25 @@ export function StatisticsPage() {
               Generator: {generatorRunning ? "Running" : "Stopped"}
             </div>
 
-            <Button
-              onClick={() => void handleStartGenerator()}
-              disabled={generatorActionLoading || generatorRunning}
-              className="bg-green-600 text-white hover:bg-green-700"
-            >
-              Start Generator
-            </Button>
+            {canControlGenerator && (
+              <>
+                <Button
+                  onClick={() => void handleStartGenerator()}
+                  disabled={generatorActionLoading || generatorRunning}
+                  className="bg-green-600 text-white hover:bg-green-700"
+                >
+                  Start Generator
+                </Button>
 
-            <Button
-              onClick={() => void handleStopGenerator()}
-              disabled={generatorActionLoading || !generatorRunning}
-              variant="outline"
-            >
-              Stop Generator
-            </Button>
+                <Button
+                  onClick={() => void handleStopGenerator()}
+                  disabled={generatorActionLoading || !generatorRunning}
+                  variant="outline"
+                >
+                  Stop Generator
+                </Button>
+              </>
+            )}
           </div>
         </div>
 

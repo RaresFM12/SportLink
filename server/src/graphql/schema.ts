@@ -3,6 +3,8 @@ export const typeDefs = `#graphql
   # ─── Event ──────────────────────────────────────────────────────────────
   type EventItem {
     id: Int!
+    createdByUserId: Int
+    createdByDisplayName: String
     title: String!
     sport: String!
     city: String!
@@ -122,6 +124,7 @@ export const typeDefs = `#graphql
       location: String
       joinedOnly: Boolean
       user: String
+      createdByUserId: Int
     ): PaginatedEvents!
 
     event(id: Int!): EventItem

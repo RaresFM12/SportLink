@@ -20,6 +20,7 @@ export type EventListQuery = {
   location?: string;
   joinedOnly?: boolean;
   user?: string;
+  createdByUserId?: number;
 };
 
 export type PaginatedEventsResponse = {
@@ -49,13 +50,13 @@ export type GeneratorStatusResponse = {
 
 // Fields fetched for list views (no comments — keep payloads small)
 const EVENT_FIELDS = `
-  id title sport city date startTime duration location
+  id createdByUserId createdByDisplayName title sport city date startTime duration location
   maxParticipants currentParticipants description participants
 `;
 
 // Fields fetched for detail view — includes comments
 const EVENT_DETAIL_FIELDS = `
-  id title sport city date startTime duration location
+  id createdByUserId createdByDisplayName title sport city date startTime duration location
   maxParticipants currentParticipants description participants
   comments { id eventId author content createdAt }
 `;
@@ -79,10 +80,11 @@ export const eventService = {
     const data = await gqlRequest<{ events: PaginatedEventsResponse }>(
       `query GetEvents(
         $page: Int, $limit: Int, $sport: String, $date: String,
-        $location: String, $joinedOnly: Boolean, $user: String
+        $location: String, $joinedOnly: Boolean, $user: String, $createdByUserId: Int
       ) {
         events(page: $page, limit: $limit, sport: $sport, date: $date,
-               location: $location, joinedOnly: $joinedOnly, user: $user) {
+               location: $location, joinedOnly: $joinedOnly, user: $user,
+               createdByUserId: $createdByUserId) {
           items { ${EVENT_FIELDS} }
           page limit totalItems totalPages
         }
@@ -95,6 +97,7 @@ export const eventService = {
         location: query.location || undefined,
         joinedOnly: query.joinedOnly ?? false,
         user: query.user,
+        createdByUserId: query.createdByUserId,
       }
     );
     return data.events;
