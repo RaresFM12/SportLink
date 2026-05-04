@@ -532,7 +532,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   }, [trySyncNow]);
 
   useEffect(() => {
-    const socket = new WebSocket(import.meta.env.VITE_SOCKET_URL);
+    const socket = new WebSocket(`ws://localhost:3001/ws`);
 
     socket.onmessage = (ev) => {
       try {

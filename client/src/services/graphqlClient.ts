@@ -1,31 +1,25 @@
-const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL;
+// Relative URL — Vite proxy forwards /graphql to localhost:3001/graphql
+// Cookies are same-origin so sessions work correctly
+const GRAPHQL_URL = '/graphql';
 
 export type GraphQLResponse<T> = {
   data?: T;
   errors?: Array<{ message: string; extensions?: { code?: string } }>;
 };
 
-/**
- * Thrown when the fetch itself failed (no network, server unreachable).
- * shouldUseOfflineFallback checks for this class.
- */
 export class NetworkError extends Error {
   constructor(cause: unknown) {
-    super(cause instanceof Error ? cause.message : "Network request failed");
-    this.name = "NetworkError";
+    super(cause instanceof Error ? cause.message : 'Network request failed');
+    this.name = 'NetworkError';
   }
 }
 
-/**
- * Thrown when the server responded but GraphQL returned errors.
- * These should NOT trigger offline fallback — they are domain errors.
- */
 export class GraphQLError extends Error {
   readonly code: string | undefined;
 
   constructor(message: string, code?: string) {
     super(message);
-    this.name = "GraphQLError";
+    this.name = 'GraphQLError';
     this.code = code;
   }
 }
@@ -38,8 +32,9 @@ export async function gqlRequest<T>(
 
   try {
     response = await fetch(GRAPHQL_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ query, variables }),
     });
   } catch (err) {
@@ -58,7 +53,7 @@ export async function gqlRequest<T>(
   }
 
   if (json.data === undefined) {
-    throw new GraphQLError("No data returned from GraphQL.");
+    throw new GraphQLError('No data returned from GraphQL.');
   }
 
   return json.data;

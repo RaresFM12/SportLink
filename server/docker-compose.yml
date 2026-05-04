@@ -14,5 +14,15 @@ services:
     volumes:
       - sportlink_pgdata:/var/lib/postgresql/data
 
+  mongo:
+    image: mongo:7-jammy
+    container_name: sportlink-mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - sportlink_mongodata:/data/db
+
 volumes:
   sportlink_pgdata:
+  sportlink_mongodata:

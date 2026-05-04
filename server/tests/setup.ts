@@ -1,12 +1,21 @@
-import { beforeEach, afterAll } from "vitest";
-import { prisma } from "../src/lib/prisma.js";
+/// <reference types="vitest/globals" />
+import { prisma } from '../src/lib/prisma.js';
 
-// Clean the database before every test file runs.
-// Order matters: delete children before parents (FK constraints).
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    'DATABASE_URL is not set. Create a .env file from .env.example before running tests.'
+  );
+}
+
 beforeEach(async () => {
   await prisma.comment.deleteMany();
   await prisma.participant.deleteMany();
   await prisma.event.deleteMany();
+  await prisma.rolePermission.deleteMany();
+  await prisma.userRole.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.permission.deleteMany();
+  await prisma.role.deleteMany();
 });
 
 afterAll(async () => {
