@@ -3,6 +3,30 @@ import { authService } from '../services/authService.js';
 import { securityLogService } from '../services/securityLogService.js';
 
 export const authController = {
+  async register(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { username, displayName, password } = req.body as {
+        username?: string;
+        displayName?: string;
+        password?: string;
+      };
+      const user = await authService.register({
+        username: username ?? '',
+        displayName: displayName ?? '',
+        password: password ?? '',
+      });
+      res.status(201).json({
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        role: user.role,
+        permissions: user.permissions,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
   async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { username, password } = req.body as { username?: string; password?: string };

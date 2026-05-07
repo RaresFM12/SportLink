@@ -88,7 +88,7 @@ export function LoginPage() {
             <Button
               type="submit"
               disabled={loading || !username || !password}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className="w-full bg-blue-600 text-white hover:bg-blue-700"
             >
               {loading ? "Signing in..." : "Login"}
             </Button>

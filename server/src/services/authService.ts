@@ -10,11 +10,80 @@ export type SessionUser = {
   permissions: string[];
 };
 
+export type RegisterInput = {
+  username: string;
+  displayName: string;
+  password: string;
+};
+
 function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
 }
 
 export const authService = {
+  async register(input: RegisterInput): Promise<SessionUser> {
+    const username = input.username.trim().toLowerCase();
+    const displayName = input.displayName.trim();
+    const password = input.password;
+
+    if (!username || !displayName || !password) {
+      throw new HttpError(400, 'Username, full name, and password are required.');
+    }
+
+    if (username.length < 3) {
+      throw new HttpError(400, 'Username must be at least 3 characters.');
+    }
+
+    if (password.length < 6) {
+      throw new HttpError(400, 'Password must be at least 6 characters.');
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { username } });
+    if (existingUser) {
+      throw new HttpError(409, 'Username is already taken.');
+    }
+
+    const userRole = await prisma.role.findUnique({ where: { name: 'USER' } });
+    if (!userRole) {
+      throw new HttpError(500, 'Default USER role is missing.');
+    }
+
+    const user = await prisma.user.create({
+      data: {
+        username,
+        displayName,
+        passwordHash: hashPassword(password),
+        userRoles: {
+          create: {
+            roleId: userRole.id,
+          },
+        },
+      },
+      include: {
+        userRoles: {
+          include: {
+            role: {
+              include: {
+                rolePermissions: {
+                  include: { permission: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const role = user.userRoles[0];
+    return {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      role: (role?.role.name ?? 'USER') as 'USER',
+      permissions: role?.role.rolePermissions.map((rp) => rp.permission.action) ?? [],
+    };
+  },
+
   async login(username: string, password: string): Promise<SessionUser> {
     if (!username || !password) {
       throw new HttpError(400, 'Username and password are required.');

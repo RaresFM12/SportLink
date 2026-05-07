@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin } from '../middleware/requireAuth.js';
 export const authRoutes = Router();
 
 authRoutes.post('/login', authController.login);
+authRoutes.post('/register', authController.register);
 authRoutes.post('/logout', requireAuth, authController.logout);
 authRoutes.get('/me', authController.me);
 authRoutes.get('/users', requireAuth, requireAdmin, authController.listUsers);
