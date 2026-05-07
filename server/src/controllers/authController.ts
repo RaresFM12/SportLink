@@ -14,6 +14,7 @@ export const authController = {
         displayName: user.displayName,
         role: user.role,
         permissions: user.permissions,
+        sid: req.sessionID,
       });
     } catch (error) {
       next(error);
@@ -31,10 +32,25 @@ export const authController = {
       });
     }
 
+    const headerSessionId = req.get('x-session-id');
+
     req.session.destroy((err) => {
       if (err) return next(err);
-      res.clearCookie('connect.sid');
-      res.status(200).json({ message: 'Logged out successfully.' });
+
+      const finish = () => {
+        res.clearCookie('connect.sid');
+        res.status(200).json({ message: 'Logged out successfully.' });
+      };
+
+      if (headerSessionId && headerSessionId !== req.sessionID) {
+        req.sessionStore.destroy(headerSessionId, (storeErr) => {
+          if (storeErr) return next(storeErr);
+          finish();
+        });
+        return;
+      }
+
+      finish();
     });
   },
 

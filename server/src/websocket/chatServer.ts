@@ -59,7 +59,8 @@ function sendTo(ws: WebSocket, message: OutgoingChatMessage): void {
 
 async function resolveUser(
   req: IncomingMessage,
-  sessionMiddleware: ReturnType<typeof session>
+  sessionMiddleware: ReturnType<typeof session>,
+  sessionStore: StoreWithGet
 ): Promise<SessionUser | undefined> {
   try {
     const reqWithSession = req as RequestWithSession;
@@ -89,14 +90,8 @@ async function resolveUser(
 
     if (!sid) return undefined;
 
-    const store = (sessionMiddleware as unknown as { store?: StoreWithGet }).store;
-    if (!store) {
-      console.log('[chat] No session store available');
-      return undefined;
-    }
-
     return await new Promise<SessionUser | undefined>((resolve) => {
-      store.get(sid, (err, sessionData) => {
+      sessionStore.get(sid, (err, sessionData) => {
         if (err) {
           console.log('[chat] store.get error:', err);
           resolve(undefined);
@@ -119,7 +114,8 @@ async function resolveUser(
 }
 
 export function initializeChatWebSocketServer(
-  sessionMiddleware: ReturnType<typeof session>
+  sessionMiddleware: ReturnType<typeof session>,
+  sessionStore: StoreWithGet
 ): WebSocketServer {
   chatWss = new WebSocketServer({ noServer: true });
 
@@ -129,7 +125,7 @@ export function initializeChatWebSocketServer(
     // Handle everything async but catch all errors
     void (async () => {
       try {
-        const sessionUser = await resolveUser(req, sessionMiddleware);
+        const sessionUser = await resolveUser(req, sessionMiddleware, sessionStore);
 
         if (!sessionUser) {
           console.log('[chat] Rejected: no user in session');

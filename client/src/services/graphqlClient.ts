@@ -1,6 +1,4 @@
-// Relative URL — Vite proxy forwards /graphql to localhost:3001/graphql
-// Cookies are same-origin so sessions work correctly
-const GRAPHQL_URL = '/graphql';
+import { GRAPHQL_URL, sessionHeaders } from '../config/backend';
 
 export type GraphQLResponse<T> = {
   data?: T;
@@ -33,7 +31,7 @@ export async function gqlRequest<T>(
   try {
     response = await fetch(GRAPHQL_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...sessionHeaders() },
       credentials: 'include',
       body: JSON.stringify({ query, variables }),
     });

@@ -7,12 +7,10 @@ import { Badge } from '../components/ui/badge';
 import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import { usePageTracking } from '../hooks/usePageTracking';
+import { API_BASE_URL, getSessionId, sessionHeaders, wsUrl } from '../config/backend';
 
-// Relative paths work via Vite proxy — same origin, cookies work
-const API_BASE = '/api';
-// WebSocket must use absolute URL but same port as frontend (5173)
-// Vite proxies /ws -> ws://localhost:3001/ws
-const WS_CHAT_URL = "ws://localhost:3001/ws/chat";
+const API_BASE = API_BASE_URL;
+const WS_CHAT_URL = wsUrl('/ws/chat');
 
 type ChatMsg = {
   type: 'chat';
@@ -59,10 +57,11 @@ export function ChatPage() {
 
     async function connect() {
       // Fetch session ID from server so we can pass it to the WebSocket
-      let sid: string | null = null;
+      let sid: string | null = getSessionId();
       try {
         const res = await fetch(`${API_BASE}/auth/session-id`, {
           credentials: 'include',
+          headers: sessionHeaders(),
         });
         if (res.ok) {
           const data = (await res.json()) as { sid: string };

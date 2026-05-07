@@ -1,6 +1,6 @@
 import cors from 'cors';
 import express from 'express';
-import session from 'express-session';
+import session, { type SessionData } from 'express-session';
 import { eventRoutes } from './routes/eventRoutes.js';
 import { statisticsRoutes } from './routes/statisticsRoutes.js';
 import { generatorRoutes } from './routes/generatorRoutes.js';
@@ -14,8 +14,15 @@ import { applyGraphQLMiddleware } from './graphql/server.js';
 export type SessionStore = session.Store;
 
 const SESSION_SECRET = process.env.SESSION_SECRET ?? 'sportlink-dev-secret-change-in-prod';
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.134:5173')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+export const sessionStore = new session.MemoryStore();
 
 export const sessionMiddleware = session({
+  store: sessionStore,
   secret: SESSION_SECRET,
   resave: true,
   saveUninitialized: false,
@@ -29,22 +36,48 @@ export const sessionMiddleware = session({
 
 export const app = express();
 
-// HTTP requests come via Vite proxy (origin: localhost:5173)
-// WebSocket connections come directly (origin: localhost:5173)
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:4173', 'http://127.0.0.1:5173'],
+  origin: CLIENT_ORIGINS,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Session-Id'],
 }));
 
 app.options('*', cors({
-  origin: ['http://localhost:5173', 'http://localhost:4173', 'http://127.0.0.1:5173'],
+  origin: CLIENT_ORIGINS,
   credentials: true,
 }));
 
 app.use(express.json());
 app.use(sessionMiddleware);
+
+app.use((req, _res, next) => {
+  if (req.session?.user) {
+    next();
+    return;
+  }
+
+  const sessionId = req.get('x-session-id');
+  if (!sessionId) {
+    next();
+    return;
+  }
+
+  req.sessionStore.get(sessionId, (err: unknown, sessionData?: SessionData | null) => {
+    if (err) {
+      console.error('[session] Failed to load X-Session-Id:', err);
+      next();
+      return;
+    }
+
+    if (sessionData?.user) {
+      req.session.user = sessionData.user;
+    }
+
+    next();
+  });
+});
+
 app.use(actionLogger);
 
 app.use((req, _res, next) => {

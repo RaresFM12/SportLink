@@ -1,5 +1,5 @@
 import http from 'http';
-import { configureApp, sessionMiddleware } from './app.js';
+import { configureApp, sessionMiddleware, sessionStore } from './app.js';
 import { initializeWebSocketServer } from './websocket/wsServer.js';
 import { initializeChatWebSocketServer } from './websocket/chatServer.js';
 import { connectMongo } from './lib/mongo.js';
@@ -22,7 +22,7 @@ async function main(): Promise<void> {
   const generatorWss = initializeWebSocketServer();
 
   // Chat WebSocket
-  const chatWss = initializeChatWebSocketServer(sessionMiddleware);
+  const chatWss = initializeChatWebSocketServer(sessionMiddleware, sessionStore);
 
   httpServer.on('upgrade', (req, socket, head) => {
     const { pathname } = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);

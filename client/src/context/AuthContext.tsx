@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { API_BASE_URL, clearSessionId, sessionHeaders, setSessionId } from '../config/backend';
 
 export type SessionUser = {
   id: number;
@@ -14,6 +15,10 @@ export type SessionUser = {
   displayName: string;
   role: 'ADMIN' | 'USER';
   permissions: string[];
+};
+
+type LoginResponse = SessionUser & {
+  sid?: string;
 };
 
 type AuthContextValue = {
@@ -27,16 +32,17 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-// Relative paths — Vite proxy forwards to localhost:3001
-// This means cookies are same-origin and work correctly
-const API = '/api';
+const API = API_BASE_URL;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/auth/me`, { credentials: 'include' })
+    fetch(`${API}/auth/me`, {
+      credentials: 'include',
+      headers: sessionHeaders(),
+    })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: SessionUser | null) => setUser(data))
       .catch(() => setUser(null))
@@ -54,15 +60,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const err = (await res.json()) as { message?: string };
       throw new Error(err.message ?? 'Login failed.');
     }
-    const data = (await res.json()) as SessionUser;
+    const data = (await res.json()) as LoginResponse;
+    if (data.sid) setSessionId(data.sid);
     setUser(data);
   }, []);
 
   const logout = useCallback(async () => {
     await fetch(`${API}/auth/logout`, {
       method: 'POST',
+      headers: sessionHeaders(),
       credentials: 'include',
     });
+    clearSessionId();
     setUser(null);
   }, []);
 

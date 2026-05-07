@@ -13,5 +13,5 @@ authRoutes.get('/users', requireAuth, requireAdmin, authController.listUsers);
 // to the WebSocket connection as ?sid=
 // This is more reliable than reading document.cookie
 authRoutes.get('/session-id', requireAuth, (req, res) => {
-  res.json({ sid: req.sessionID });
+  res.json({ sid: req.get('x-session-id') ?? req.sessionID });
 });

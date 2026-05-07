@@ -1,4 +1,6 @@
-const API = '/api/security';
+import { apiUrl, sessionHeaders } from '../config/backend';
+
+const API = apiUrl('/security');
 
 export type ObservationUser = {
   id: number;
@@ -36,7 +38,10 @@ export type ActionLog = {
 };
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { credentials: 'include' });
+  const res = await fetch(url, {
+    credentials: 'include',
+    headers: sessionHeaders(),
+  });
   if (!res.ok) {
     const body = (await res.json().catch(() => null)) as { message?: string } | null;
     throw new Error(body?.message ?? `Request failed with status ${res.status}`);

@@ -18,6 +18,7 @@ import {
   type StatisticsData,
   type UpdateEventInput,
 } from "../services/eventService";
+import { wsUrl } from "../config/backend";
 import { offlineEvents } from "../services/offlineEvents";
 import { isServerReachable, syncPendingOperations } from "../services/syncService";
 
@@ -532,7 +533,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   }, [trySyncNow]);
 
   useEffect(() => {
-    const socket = new WebSocket(`ws://localhost:3001/ws`);
+    const socket = new WebSocket(wsUrl("/ws"));
 
     socket.onmessage = (ev) => {
       try {
