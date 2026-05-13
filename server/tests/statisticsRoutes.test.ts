@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/controllers/statisticsController.js', () => ({
   statisticsController: {
-    get: vi.fn()
+    get: vi.fn(),
+    coParticipation: vi.fn()
   }
 }));
 
@@ -19,9 +20,12 @@ describe('statisticsRoutes', () => {
         stack: layer.route.stack
       }));
 
-    expect(routes).toHaveLength(1);
+    expect(routes).toHaveLength(2);
     expect(routes[0].path).toBe('/');
     expect(routes[0].methods).toEqual({ get: true });
-    expect(routes[0].stack[0].handle).toBe(statisticsController.get);
+    expect(routes[0].stack.at(-1)?.handle).toBe(statisticsController.get);
+    expect(routes[1].path).toBe('/co-participation');
+    expect(routes[1].methods).toEqual({ get: true });
+    expect(routes[1].stack.at(-1)?.handle).toBe(statisticsController.coParticipation);
   });
 });

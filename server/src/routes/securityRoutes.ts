@@ -19,3 +19,11 @@ securityRoutes.get(
   requirePermission('user:manage'),
   securityController.recentLogs
 );
+
+securityRoutes.get(
+  '/ai-status',
+  requireAuth,
+  requireAdmin,
+  requirePermission('user:manage'),
+  securityController.aiStatus
+);

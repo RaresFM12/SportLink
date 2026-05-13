@@ -22,4 +22,13 @@ export const securityController = {
       next(error);
     }
   },
+
+  async aiStatus(_req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const status = await securityLogService.getAiStatus();
+      res.status(200).json(status);
+    } catch (error) {
+      next(error);
+    }
+  },
 };

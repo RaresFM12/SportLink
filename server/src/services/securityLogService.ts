@@ -2,6 +2,7 @@ import type { Request } from 'express';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma.js';
 import type { SessionUser } from './authService.js';
+import { anomalyDetectionService, type BehaviourFeatures } from './anomalyDetectionService.js';
 
 type LogActionInput = {
   req: Request;
@@ -14,6 +15,7 @@ const HIGH_FREQUENCY_WINDOW_MS = 60 * 1000;
 const REPEATED_FORBIDDEN_WINDOW_MS = 10 * 60 * 1000;
 const HIGH_FREQUENCY_THRESHOLD = 30;
 const REPEATED_FORBIDDEN_THRESHOLD = 3;
+const FAILED_AUTH_THRESHOLD = 3;
 
 function buildActionInformation(req: Request, explicit?: string): string {
   if (explicit) return explicit;
@@ -77,7 +79,7 @@ async function detectSuspiciousBehaviour(user: SessionUser, actionInfo: string, 
     );
   }
 
-  const [recentActionCount, recentForbiddenCount] = await Promise.all([
+  const [recentActionCount, recentForbiddenCount, failedAuthCount, recentPaths] = await Promise.all([
     prisma.actionLog.count({
       where: {
         userId: user.id,
@@ -91,7 +93,40 @@ async function detectSuspiciousBehaviour(user: SessionUser, actionInfo: string, 
         createdAt: { gte: forbiddenSince },
       },
     }),
+    prisma.actionLog.count({
+      where: {
+        userId: user.id,
+        statusCode: { in: [401, 403] },
+        createdAt: { gte: forbiddenSince },
+      },
+    }),
+    prisma.actionLog.findMany({
+      where: {
+        userId: user.id,
+        createdAt: { gte: highFrequencySince },
+      },
+      select: { path: true },
+      distinct: ['path'],
+    }),
   ]);
+
+  const features: BehaviourFeatures = {
+    recentActionCount,
+    recentForbiddenCount,
+    failedAuthCount,
+    distinctPathCount: recentPaths.length,
+    statusCode,
+  };
+  const prediction = anomalyDetectionService.predict(features);
+
+  if (prediction.label !== 'normal') {
+    await placeUnderObservation(
+      user,
+      `AI ${prediction.label} (${prediction.score}): ${prediction.reasons.join(', ')}`,
+      actionInfo,
+      prediction.label === 'critical' ? 8 : 4
+    );
+  }
 
   if (recentActionCount >= HIGH_FREQUENCY_THRESHOLD) {
     await placeUnderObservation(
@@ -106,6 +141,15 @@ async function detectSuspiciousBehaviour(user: SessionUser, actionInfo: string, 
     await placeUnderObservation(
       user,
       `Repeated forbidden actions: ${recentForbiddenCount} denied attempts in 10 minutes`,
+      actionInfo,
+      5
+    );
+  }
+
+  if (failedAuthCount >= FAILED_AUTH_THRESHOLD) {
+    await placeUnderObservation(
+      user,
+      `AI detected repeated authentication/authorization failures: ${failedAuthCount} in 10 minutes`,
       actionInfo,
       5
     );
@@ -134,6 +178,29 @@ export const securityLogService = {
     });
 
     await detectSuspiciousBehaviour(user, actionInfo, statusCode);
+  },
+
+  async getAiStatus() {
+    const now = Date.now();
+    const since = new Date(now - HIGH_FREQUENCY_WINDOW_MS);
+    const [actionsLastMinute, usersUnderObservation, latestObservation] = await Promise.all([
+      prisma.actionLog.count({ where: { createdAt: { gte: since } } }),
+      prisma.observationUser.count(),
+      prisma.observationUser.findFirst({
+        orderBy: { lastActionAt: 'desc' },
+        include: {
+          user: { select: { id: true, username: true, displayName: true } },
+        },
+      }),
+    ]);
+
+    return {
+      model: 'sportlink-local-anomaly-v1',
+      status: 'active',
+      actionsLastMinute,
+      usersUnderObservation,
+      latestObservation,
+    };
   },
 
   async markSuspicious(user: SessionUser, reason: string, actionInformation: string): Promise<void> {

@@ -7,6 +7,7 @@ export default defineConfig({
   fullyParallel: true,
   use: {
     baseURL: FRONTEND_URL,
+    ignoreHTTPSErrors: true,
     trace: "on-first-retry",
   },
   webServer: {
