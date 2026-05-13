@@ -6,7 +6,10 @@ export const authRoutes = Router();
 
 authRoutes.post('/login', authController.login);
 authRoutes.post('/register', authController.register);
+authRoutes.post('/password/forgot', authController.requestPasswordReset);
+authRoutes.post('/password/reset', authController.resetPassword);
 authRoutes.post('/logout', requireAuth, authController.logout);
+authRoutes.post('/tokens', requireAuth, authController.createToken);
 authRoutes.get('/me', requireAuth, authController.me);
 authRoutes.get('/users', requireAuth, requireAdmin, authController.listUsers);
 

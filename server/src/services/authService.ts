@@ -1,4 +1,4 @@
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { prisma } from '../lib/prisma.js';
 import { HttpError } from '../utils/httpErrors.js';
 
@@ -47,8 +47,14 @@ const USER_PERMISSIONS = [
   'chat:write',
 ] as const;
 
+const PASSWORD_RESET_TTL_MS = Number(process.env.PASSWORD_RESET_TTL_MS ?? 1000 * 60 * 30);
+
 function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
+}
+
+function hashResetToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
 }
 
 async function ensureAuthDefaults(): Promise<void> {
@@ -221,6 +227,72 @@ export const authService = {
       role: roleName,
       permissions,
     };
+  },
+
+  async requestPasswordReset(username: string): Promise<{ resetToken?: string; expiresAt?: Date }> {
+    await ensureAuthDefaults();
+
+    const normalizedUsername = username.trim().toLowerCase();
+    if (!normalizedUsername) {
+      throw new HttpError(400, 'Username is required.');
+    }
+
+    const user = await prisma.user.findUnique({ where: { username: normalizedUsername } });
+    if (!user) {
+      return {};
+    }
+
+    await prisma.passwordResetToken.updateMany({
+      where: {
+        userId: user.id,
+        usedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      data: { usedAt: new Date() },
+    });
+
+    const resetToken = randomBytes(32).toString('base64url');
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MS);
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashResetToken(resetToken),
+        expiresAt,
+      },
+    });
+
+    return { resetToken, expiresAt };
+  },
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const resetToken = token.trim();
+    if (!resetToken || !newPassword) {
+      throw new HttpError(400, 'Reset token and new password are required.');
+    }
+
+    if (newPassword.length < 6) {
+      throw new HttpError(400, 'Password must be at least 6 characters.');
+    }
+
+    const tokenHash = hashResetToken(resetToken);
+    const storedToken = await prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!storedToken || storedToken.usedAt || storedToken.expiresAt <= new Date()) {
+      throw new HttpError(400, 'Reset token is invalid or expired.');
+    }
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: storedToken.userId },
+        data: { passwordHash: hashPassword(newPassword) },
+      }),
+      prisma.passwordResetToken.update({
+        where: { id: storedToken.id },
+        data: { usedAt: new Date() },
+      }),
+    ]);
   },
 
   async getUserById(id: number): Promise<SessionUser | null> {

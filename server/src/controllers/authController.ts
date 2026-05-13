@@ -1,7 +1,11 @@
 import type { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/authService.js';
 import { securityLogService } from '../services/securityLogService.js';
-import { createAuthToken } from '../services/tokenService.js';
+import {
+  createAuthToken,
+  resolveTokenPermissions,
+  type PermissionTokenScheme,
+} from '../services/tokenService.js';
 
 export const authController = {
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -29,6 +33,69 @@ export const authController = {
         token,
         sid: req.sessionID,
       });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  createToken(req: Request, res: Response): void {
+    const user = req.authUser ?? req.session.user;
+    if (!user) {
+      res.status(401).json({ message: 'Not authenticated.' });
+      return;
+    }
+
+    const { scheme = 'full', permissions } = req.body as {
+      scheme?: PermissionTokenScheme;
+      permissions?: string[];
+    };
+    const validSchemes: PermissionTokenScheme[] = ['full', 'read-only', 'event-management', 'admin'];
+    if (!validSchemes.includes(scheme)) {
+      res.status(400).json({ message: 'Unknown token permission scheme.' });
+      return;
+    }
+
+    const scopedPermissions = resolveTokenPermissions(user, scheme, permissions);
+    if (scheme === 'admin' && user.role !== 'ADMIN') {
+      res.status(403).json({ message: 'Admin token scheme requires an ADMIN account.' });
+      return;
+    }
+
+    if (permissions?.length && scopedPermissions.length !== new Set(permissions).size) {
+      res.status(403).json({ message: 'Requested token permissions exceed the current user role.' });
+      return;
+    }
+
+    const token = createAuthToken(user, req.sessionID, {
+      scheme,
+      permissions: scopedPermissions,
+    });
+    res.status(201).json({
+      token,
+      sid: req.sessionID,
+      scheme,
+      permissions: scopedPermissions,
+    });
+  },
+
+  async requestPasswordReset(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { username } = req.body as { username?: string };
+      const reset = await authService.requestPasswordReset(username ?? '');
+      res.status(200).json({
+        message: 'If the account exists, password reset instructions were generated.',
+        ...reset,
+      });
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token, password } = req.body as { token?: string; password?: string };
+      await authService.resetPassword(token ?? '', password ?? '');
+      res.status(200).json({ message: 'Password reset successfully.' });
     } catch (error) {
       next(error);
     }

@@ -59,20 +59,37 @@ app.use(express.json());
 app.use(sessionMiddleware);
 
 app.use((req, _res, next) => {
+  const bearerToken = readBearerToken(req.get('authorization'));
+  const tokenPayload = bearerToken ? verifyAuthToken(bearerToken) : null;
+
   if (req.session?.user) {
+    if (
+      tokenPayload &&
+      tokenPayload.sid === req.sessionID &&
+      tokenPayload.id === req.session.user.id &&
+      tokenPayload.role === req.session.user.role
+    ) {
+      const allowedPermissions = new Set(req.session.user.permissions);
+      req.authUser = {
+        ...req.session.user,
+        permissions: tokenPayload.permissions.filter((permission) => allowedPermissions.has(permission)),
+      };
+      req.authTokenScheme = tokenPayload.scheme;
+    } else {
+      req.authUser = req.session.user;
+    }
     next();
     return;
   }
 
-  const bearerToken = readBearerToken(req.get('authorization'));
-  const tokenPayload = bearerToken ? verifyAuthToken(bearerToken) : null;
-  const sessionId = req.get('x-session-id') ?? tokenPayload?.sid;
+  const headerSessionId = req.get('x-session-id');
+  const sessionId = headerSessionId ?? tokenPayload?.sid;
   if (!sessionId) {
     next();
     return;
   }
 
-  if (bearerToken && !tokenPayload) {
+  if (bearerToken && !tokenPayload && !headerSessionId) {
     next();
     return;
   }
@@ -103,6 +120,16 @@ app.use((req, _res, next) => {
       req.session.user = sessionData.user;
       req.session.authToken = sessionData.authToken;
       req.session.lastActivityAt = sessionData.lastActivityAt;
+      if (tokenPayload) {
+        const allowedPermissions = new Set(sessionData.user.permissions);
+        req.authUser = {
+          ...sessionData.user,
+          permissions: tokenPayload.permissions.filter((permission) => allowedPermissions.has(permission)),
+        };
+        req.authTokenScheme = tokenPayload.scheme;
+      } else {
+        req.authUser = sessionData.user;
+      }
     }
 
     next();

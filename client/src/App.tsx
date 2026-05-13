@@ -6,6 +6,7 @@ import { MainLayout } from './components/MainLayout';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage';
 import { EventsListPage } from './pages/EventsListPage';
 import { EventDetailsSophisticatedPage } from './pages/EventDetailPage';
 import { CreateEventPage } from './pages/CreateEventPage';
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/password-recovery" element={<PasswordRecoveryPage />} />
 
             {/* All authenticated routes use MainLayout */}
             <Route

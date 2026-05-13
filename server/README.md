@@ -8,7 +8,9 @@ Express + TypeScript backend for the sports events matchmaking app.
 - Statistics endpoint
 - Server-side validation
 - Server-side pagination
-- RAM-only storage (no database, no file persistence)
+- Prisma/PostgreSQL persistence
+- Session, bearer token, and `X-Session-Id` authentication
+- Role permissions, scoped permission tokens, and password recovery
 - Tests with Vitest + Supertest
 
 ## Run locally
@@ -18,10 +20,10 @@ npm install
 npm run dev
 ```
 
-The server starts on:
+The server listens on every network interface so it is reachable on the LAN:
 
 ```bash
-https://localhost:3001
+https://0.0.0.0:3001
 ```
 
 ## Bronze auth / HTTPS setup
@@ -51,8 +53,18 @@ npm run dev -- --host 0.0.0.0
 ```
 
 Login/register now return a signed bearer token plus an HTTP-only session cookie.
-The backend checks role permissions from the authenticated session and expires it
-after `SESSION_IDLE_TIMEOUT_MS` of inactivity.
+The backend accepts three auth paths for lab testing: the session cookie, a signed
+`Authorization: Bearer <token>` header, or the stored `X-Session-Id` header used
+by the LAN client and WebSockets. Role permissions are checked on REST and
+GraphQL operations, scoped bearer tokens can restrict permissions further, and
+sessions expire after `SESSION_IDLE_TIMEOUT_MS` of inactivity.
+
+Apply database migrations before running after pulling auth changes:
+
+```bash
+npx prisma migrate deploy
+npx prisma generate
+```
 
 ## Build
 
@@ -72,6 +84,15 @@ npm run coverage
 
 ### Health
 - `GET /api/health`
+
+### Auth
+- `POST /api/auth/login`
+- `POST /api/auth/register`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `POST /api/auth/tokens`
+- `POST /api/auth/password/forgot`
+- `POST /api/auth/password/reset`
 
 ### Events
 - `GET /api/events`

@@ -11,6 +11,7 @@ beforeEach(async () => {
   await prisma.comment.deleteMany();
   await prisma.participant.deleteMany();
   await prisma.event.deleteMany();
+  await prisma.passwordResetToken.deleteMany();
   await prisma.rolePermission.deleteMany();
   await prisma.userRole.deleteMany();
   await prisma.user.deleteMany();

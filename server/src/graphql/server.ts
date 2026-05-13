@@ -21,7 +21,7 @@ export async function applyGraphQLMiddleware(app: Application): Promise<void> {
     '/graphql',
     expressMiddleware(server, {
       context: async ({ req }): Promise<GraphQLContext> => ({
-        user: req.session?.user,
+        user: req.authUser ?? req.session?.user,
       }),
     })
   );

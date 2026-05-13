@@ -100,10 +100,25 @@ model User {
   displayName  String
   createdAt    DateTime   @default(now())
 
-  userRoles    UserRole[]
-  actionLogs   ActionLog[]
-  observation  ObservationUser?
-  createdEvents Event[]
+  userRoles           UserRole[]
+  actionLogs          ActionLog[]
+  observation         ObservationUser?
+  createdEvents       Event[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
 }
 
 // ─── UserRole (junction: User ↔ Role) ────────────────────────────────────────

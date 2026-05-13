@@ -114,6 +114,63 @@ describe('auth routes', () => {
       .expect(403);
   });
 
+  it('creates scoped permission tokens that cannot exceed their scheme', async () => {
+    await seedAuthData();
+
+    const login = await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'rares', password: 'rares123' })
+      .expect(200);
+
+    const scoped = await request(app)
+      .post('/api/auth/tokens')
+      .set('Authorization', `Bearer ${login.body.token}`)
+      .set('X-Session-Id', login.body.sid)
+      .send({ scheme: 'read-only' })
+      .expect(201);
+
+    expect(scoped.body.permissions).toContain('event:read');
+    expect(scoped.body.permissions).not.toContain('event:create');
+
+    await request(app)
+      .post('/api/events')
+      .set('Authorization', `Bearer ${scoped.body.token}`)
+      .set('X-Session-Id', scoped.body.sid)
+      .send({
+        title: 'Scoped token event',
+        sport: 'Football',
+        city: 'Bucharest',
+        date: '2026-05-20',
+        startTime: '10:00',
+        duration: '1 hour',
+        location: 'Park',
+        maxParticipants: 8,
+        description: 'Should be rejected by read-only scope.',
+      })
+      .expect(403);
+  });
+
+  it('generates a password reset token and accepts the new password', async () => {
+    await seedAuthData();
+
+    const reset = await request(app)
+      .post('/api/auth/password/forgot')
+      .send({ username: 'rares' })
+      .expect(200);
+
+    expect(reset.body.resetToken).toEqual(expect.any(String));
+
+    await request(app)
+      .post('/api/auth/password/reset')
+      .send({ token: reset.body.resetToken, password: 'newpass123' })
+      .expect(200);
+
+    await request(app)
+      .post('/api/auth/login')
+      .send({ username: 'rares', password: 'newpass123' })
+      .expect(200);
+  });
+
   it('expires an authenticated session after inactivity', async () => {
     await seedAuthData();
 

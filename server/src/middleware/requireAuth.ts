@@ -15,6 +15,15 @@ declare module 'express-session' {
   }
 }
 
+declare global {
+  namespace Express {
+    interface Request {
+      authUser?: SessionUser;
+      authTokenScheme?: string;
+    }
+  }
+}
+
 // Re-export SessionData so other files can import it from here if needed
 export type { SessionUser };
 
@@ -33,13 +42,14 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
 
   req.session.lastActivityAt = now;
+  req.authUser ??= req.session.user;
   req.session.touch();
   next();
 }
 
 export function requirePermission(action: string) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const user = req.session?.user;
+    const user = req.authUser ?? req.session?.user;
     if (!user) {
       res.status(401).json({ message: 'Not authenticated.' });
       return;
@@ -60,7 +70,7 @@ export function requirePermission(action: string) {
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  const user = req.session?.user;
+  const user = req.authUser ?? req.session?.user;
   if (!user) {
     res.status(401).json({ message: 'Not authenticated.' });
     return;
