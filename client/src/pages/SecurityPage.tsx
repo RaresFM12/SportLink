@@ -58,6 +58,14 @@ export function SecurityPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      void refreshSecurityData().catch(() => undefined);
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
   if (loading) {
     return <div className="py-12 text-center text-gray-600">Loading security data...</div>;
   }
