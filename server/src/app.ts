@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import session, { type SessionData } from 'express-session';
@@ -10,11 +11,15 @@ import { securityRoutes } from './routes/securityRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { actionLogger } from './middleware/actionLogger.js';
 import { applyGraphQLMiddleware } from './graphql/server.js';
+import { readBearerToken, verifyAuthToken } from './services/tokenService.js';
 
 export type SessionStore = session.Store;
 
 const SESSION_SECRET = process.env.SESSION_SECRET ?? 'sportlink-dev-secret-change-in-prod';
-const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.134:5173')
+const IS_HTTPS = process.env.NODE_ENV !== 'test' &&
+  (process.env.HTTPS === 'true' || Boolean(process.env.SSL_KEY_PATH && process.env.SSL_CERT_PATH));
+const SESSION_IDLE_TIMEOUT_MS = Number(process.env.SESSION_IDLE_TIMEOUT_MS ?? 1000 * 60 * 15);
+const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? 'https://localhost:5173,https://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5173')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -26,11 +31,13 @@ export const sessionMiddleware = session({
   secret: SESSION_SECRET,
   resave: true,
   saveUninitialized: false,
+  rolling: true,
+  name: 'sportlink.sid',
   cookie: {
-    httpOnly: false,
-    secure: false,
-    maxAge: 1000 * 60 * 60 * 24,
-    sameSite: 'lax',
+    httpOnly: true,
+    secure: IS_HTTPS,
+    maxAge: SESSION_IDLE_TIMEOUT_MS,
+    sameSite: IS_HTTPS ? 'none' : 'lax',
   },
 });
 
@@ -57,8 +64,15 @@ app.use((req, _res, next) => {
     return;
   }
 
-  const sessionId = req.get('x-session-id');
+  const bearerToken = readBearerToken(req.get('authorization'));
+  const tokenPayload = bearerToken ? verifyAuthToken(bearerToken) : null;
+  const sessionId = req.get('x-session-id') ?? tokenPayload?.sid;
   if (!sessionId) {
+    next();
+    return;
+  }
+
+  if (bearerToken && !tokenPayload) {
     next();
     return;
   }
@@ -70,8 +84,25 @@ app.use((req, _res, next) => {
       return;
     }
 
-    if (sessionData?.user) {
+    const isIdleExpired = sessionData?.lastActivityAt &&
+      Date.now() - sessionData.lastActivityAt > SESSION_IDLE_TIMEOUT_MS;
+
+    if (isIdleExpired) {
+      req.sessionStore.destroy(sessionId, () => next());
+      return;
+    }
+
+    if (
+      sessionData?.user &&
+      (!tokenPayload || (
+        tokenPayload.sid === sessionId &&
+        tokenPayload.id === sessionData.user.id &&
+        tokenPayload.role === sessionData.user.role
+      ))
+    ) {
       req.session.user = sessionData.user;
+      req.session.authToken = sessionData.authToken;
+      req.session.lastActivityAt = sessionData.lastActivityAt;
     }
 
     next();

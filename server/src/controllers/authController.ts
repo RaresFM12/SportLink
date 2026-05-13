@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/authService.js';
 import { securityLogService } from '../services/securityLogService.js';
+import { createAuthToken } from '../services/tokenService.js';
 
 export const authController = {
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -15,12 +16,18 @@ export const authController = {
         displayName: displayName ?? '',
         password: password ?? '',
       });
+      req.session.user = user;
+      req.session.lastActivityAt = Date.now();
+      const token = createAuthToken(user, req.sessionID);
+      req.session.authToken = token;
       res.status(201).json({
         id: user.id,
         username: user.username,
         displayName: user.displayName,
         role: user.role,
         permissions: user.permissions,
+        token,
+        sid: req.sessionID,
       });
     } catch (error) {
       next(error);
@@ -32,12 +39,16 @@ export const authController = {
       const { username, password } = req.body as { username?: string; password?: string };
       const user = await authService.login(username ?? '', password ?? '');
       req.session.user = user;
+      req.session.lastActivityAt = Date.now();
+      const token = createAuthToken(user, req.sessionID);
+      req.session.authToken = token;
       res.status(200).json({
         id: user.id,
         username: user.username,
         displayName: user.displayName,
         role: user.role,
         permissions: user.permissions,
+        token,
         sid: req.sessionID,
       });
     } catch (error) {
@@ -84,7 +95,9 @@ export const authController = {
       res.status(401).json({ message: 'Not authenticated.' });
       return;
     }
-    res.status(200).json(user);
+    const token = req.session.authToken ?? createAuthToken(user, req.sessionID);
+    req.session.authToken = token;
+    res.status(200).json({ ...user, token, sid: req.sessionID });
   },
 
   async listUsers(req: Request, res: Response, next: NextFunction): Promise<void> {

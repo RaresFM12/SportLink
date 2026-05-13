@@ -1,31 +1,39 @@
+import fs from 'fs';
 import http from 'http';
+import https from 'https';
 import { configureApp, sessionMiddleware, sessionStore } from './app.js';
 import { initializeWebSocketServer } from './websocket/wsServer.js';
 import { initializeChatWebSocketServer } from './websocket/chatServer.js';
 import { connectMongo } from './lib/mongo.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH;
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
 
 async function main(): Promise<void> {
   console.log('Starting SportLink server...');
 
-  // Connect to MongoDB
   console.log('Connecting to MongoDB...');
   await connectMongo();
 
   console.log('Configuring Express app...');
   const app = await configureApp();
 
-  const httpServer = http.createServer(app);
+  const server = SSL_KEY_PATH && SSL_CERT_PATH
+    ? https.createServer({
+      key: fs.readFileSync(SSL_KEY_PATH),
+      cert: fs.readFileSync(SSL_CERT_PATH),
+    }, app)
+    : http.createServer(app);
 
-  // Generator WebSocket
+  const protocol = SSL_KEY_PATH && SSL_CERT_PATH ? 'https' : 'http';
+  const wsProtocol = protocol === 'https' ? 'wss' : 'ws';
+
   const generatorWss = initializeWebSocketServer();
-
-  // Chat WebSocket
   const chatWss = initializeChatWebSocketServer(sessionMiddleware, sessionStore);
 
-  httpServer.on('upgrade', (req, socket, head) => {
-    const { pathname } = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+  server.on('upgrade', (req, socket, head) => {
+    const { pathname } = new URL(req.url ?? '/', `${protocol}://${req.headers.host ?? 'localhost'}`);
 
     if (pathname === '/ws') {
       generatorWss.handleUpgrade(req, socket, head, (ws) => {
@@ -44,11 +52,11 @@ async function main(): Promise<void> {
     socket.destroy();
   });
 
-  httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`SportLink server     → http://0.0.0.0:${PORT}`);
-    console.log(`SportLink GraphQL    → http://0.0.0.0:${PORT}/graphql`);
-    console.log(`SportLink WS/gen     → ws://0.0.0.0:${PORT}/ws`);
-    console.log(`SportLink WS/chat    → ws://0.0.0.0:${PORT}/ws/chat`);
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`SportLink server     -> ${protocol}://0.0.0.0:${PORT}`);
+    console.log(`SportLink GraphQL    -> ${protocol}://0.0.0.0:${PORT}/graphql`);
+    console.log(`SportLink WS/gen     -> ${wsProtocol}://0.0.0.0:${PORT}/ws`);
+    console.log(`SportLink WS/chat    -> ${wsProtocol}://0.0.0.0:${PORT}/ws/chat`);
   });
 }
 

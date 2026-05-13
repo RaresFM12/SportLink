@@ -5,12 +5,13 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import logo from '../assets/logo.png';
-import { API_BASE_URL } from "../config/backend";
+import { useAuth } from "../context/AuthContext";
 
 export function RegisterPage() {
   const navigate = useNavigate();
+  const { register } = useAuth();
   const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -27,23 +28,13 @@ export function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          displayName: username.trim(),
-          username: username.trim(),
-          password,
-        }),
+      await register({
+        displayName: displayName.trim(),
+        username: username.trim(),
+        password,
       });
 
-      if (!res.ok) {
-        const data = (await res.json()) as { message?: string };
-        throw new Error(data.message ?? "Registration failed.");
-      }
-
-      navigate("/login", { replace: true });
+      navigate("/events", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed.");
     } finally {
@@ -85,13 +76,13 @@ export function RegisterPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Mail</Label>
+              <Label htmlFor="displayName">Full name</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="your.email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="displayName"
+                type="text"
+                placeholder="Rares Popescu"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
                 required
               />
             </div>
@@ -119,7 +110,7 @@ export function RegisterPage() {
             </div>
             <Button
               type="submit"
-              disabled={loading || !username || !email || !password || !confirmPassword}
+              disabled={loading || !username || !displayName || !password || !confirmPassword}
               className="w-full bg-blue-600 text-white hover:bg-blue-700"
             >
               {loading ? "Creating account..." : "Register"}

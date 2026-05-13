@@ -16,12 +16,104 @@ export type RegisterInput = {
   password: string;
 };
 
+const DEFAULT_PERMISSIONS = [
+  'event:read',
+  'event:create',
+  'event:update',
+  'event:delete',
+  'event:join',
+  'event:leave',
+  'comment:create',
+  'comment:update',
+  'comment:delete',
+  'generator:start',
+  'generator:stop',
+  'user:manage',
+  'statistics:read',
+  'chat:read',
+  'chat:write',
+] as const;
+
+const USER_PERMISSIONS = [
+  'event:read',
+  'event:create',
+  'event:join',
+  'event:leave',
+  'comment:create',
+  'comment:update',
+  'comment:delete',
+  'statistics:read',
+  'chat:read',
+  'chat:write',
+] as const;
+
 function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
 }
 
+async function ensureAuthDefaults(): Promise<void> {
+  const [adminRole, userRole] = await Promise.all([
+    prisma.role.upsert({
+      where: { name: 'ADMIN' },
+      update: {},
+      create: { name: 'ADMIN', description: 'Full access to all resources' },
+    }),
+    prisma.role.upsert({
+      where: { name: 'USER' },
+      update: {},
+      create: { name: 'USER', description: 'Standard user access' },
+    }),
+  ]);
+
+  const permissions = await Promise.all(
+    DEFAULT_PERMISSIONS.map((action) =>
+      prisma.permission.upsert({
+        where: { action },
+        update: {},
+        create: { action },
+      })
+    )
+  );
+  const permissionByAction = Object.fromEntries(permissions.map((p) => [p.action, p]));
+
+  await Promise.all([
+    ...permissions.map((permission) =>
+      prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: adminRole.id,
+            permissionId: permission.id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: adminRole.id,
+          permissionId: permission.id,
+        },
+      })
+    ),
+    ...USER_PERMISSIONS.map((action) =>
+      prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: userRole.id,
+            permissionId: permissionByAction[action].id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: userRole.id,
+          permissionId: permissionByAction[action].id,
+        },
+      })
+    ),
+  ]);
+}
+
 export const authService = {
   async register(input: RegisterInput): Promise<SessionUser> {
+    await ensureAuthDefaults();
+
     const username = input.username.trim().toLowerCase();
     const displayName = input.displayName.trim();
     const password = input.password;
@@ -85,6 +177,8 @@ export const authService = {
   },
 
   async login(username: string, password: string): Promise<SessionUser> {
+    await ensureAuthDefaults();
+
     if (!username || !password) {
       throw new HttpError(400, 'Username and password are required.');
     }

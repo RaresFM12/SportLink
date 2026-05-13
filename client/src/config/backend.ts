@@ -1,14 +1,15 @@
 export const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3001/api'
+  import.meta.env.VITE_API_BASE_URL ?? 'https://localhost:3001/api'
 ).replace(/\/$/, '');
 
 export const GRAPHQL_URL =
-  import.meta.env.VITE_GRAPHQL_URL ?? 'http://localhost:3001/graphql';
+  import.meta.env.VITE_GRAPHQL_URL ?? 'https://localhost:3001/graphql';
 
 export const WS_URL =
-  import.meta.env.VITE_WS_URL ?? 'ws://localhost:3001/ws';
+  import.meta.env.VITE_WS_URL ?? 'wss://localhost:3001/ws';
 
 const SESSION_ID_STORAGE_KEY = 'sportlink.sid';
+const AUTH_TOKEN_STORAGE_KEY = 'sportlink.authToken';
 
 export function apiUrl(path = ''): string {
   if (!path) return API_BASE_URL;
@@ -49,7 +50,35 @@ export function clearSessionId(): void {
   }
 }
 
+export function getAuthToken(): string | null {
+  try {
+    return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string): void {
+  try {
+    window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  } catch {
+    // Ignore storage failures; cookie-based sessions may still work locally.
+  }
+}
+
+export function clearAuthToken(): void {
+  try {
+    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
 export function sessionHeaders(): HeadersInit {
   const sessionId = getSessionId();
-  return sessionId ? { 'X-Session-Id': sessionId } : {};
+  const token = getAuthToken();
+  return {
+    ...(sessionId ? { 'X-Session-Id': sessionId } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }

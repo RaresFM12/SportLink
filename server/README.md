@@ -21,8 +21,38 @@ npm run dev
 The server starts on:
 
 ```bash
-http://localhost:3001
+https://localhost:3001
 ```
+
+## Bronze auth / HTTPS setup
+
+Create a certificate that includes the server LAN IP, then point both apps at it:
+
+```bash
+mkdir ../certs
+mkcert -key-file ../certs/sportlink-key.pem -cert-file ../certs/sportlink-cert.pem localhost 127.0.0.1 192.168.1.134
+```
+
+In `server/.env`, set `SSL_KEY_PATH`, `SSL_CERT_PATH`, strong `SESSION_SECRET` and
+`AUTH_TOKEN_SECRET`, and include the client origin in `CLIENT_ORIGINS`.
+
+Run the backend on the server machine:
+
+```bash
+npm run dev
+```
+
+Run the client on the other machine with HTTPS and LAN URLs, for example:
+
+```bash
+$env:SSL_KEY_PATH="../certs/sportlink-key.pem"
+$env:SSL_CERT_PATH="../certs/sportlink-cert.pem"
+npm run dev -- --host 0.0.0.0
+```
+
+Login/register now return a signed bearer token plus an HTTP-only session cookie.
+The backend checks role permissions from the authenticated session and expires it
+after `SESSION_IDLE_TIMEOUT_MS` of inactivity.
 
 ## Build
 

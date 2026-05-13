@@ -22,7 +22,7 @@ function parseEventId(idParam: string | string[] | undefined): number {
 }
 
 export const eventController = {
-  getAll(req: Request, res: Response, next: NextFunction): void {
+  async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const pagination = parsePagination(req.query.page as string | undefined, req.query.limit as string | undefined);
       const filters = {
@@ -34,65 +34,65 @@ export const eventController = {
         createdByUserId: req.query.createdByUserId ? Number(req.query.createdByUserId) : undefined,
       };
 
-      const result = eventService.getAll(filters, pagination);
+      const result = await eventService.getAll(filters, pagination);
       res.status(200).json(result);
     } catch (error) {
       next(error);
     }
   },
 
-  getById(req: Request, res: Response, next: NextFunction): void {
+  async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const event = eventService.getById(parseEventId(req.params.id));
+      const event = await eventService.getById(parseEventId(req.params.id));
       res.status(200).json(event);
     } catch (error) {
       next(error);
     }
   },
 
-  create(req: Request, res: Response, next: NextFunction): void {
+  async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       validateCreateEventInput(req.body);
-      const event = eventService.create(req.body, req.session.user);
+      const event = await eventService.create(req.body, req.session.user);
       res.status(201).json(event);
     } catch (error) {
       next(error);
     }
   },
 
-  update(req: Request, res: Response, next: NextFunction): void {
+  async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       validateUpdateEventInput(req.body);
-      const event = eventService.update(parseEventId(req.params.id), req.body, req.session.user);
+      const event = await eventService.update(parseEventId(req.params.id), req.body, req.session.user);
       res.status(200).json(event);
     } catch (error) {
       next(error);
     }
   },
 
-  remove(req: Request, res: Response, next: NextFunction): void {
+  async remove(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      eventService.remove(parseEventId(req.params.id), req.session.user);
+      await eventService.remove(parseEventId(req.params.id), req.session.user);
       res.status(204).send();
     } catch (error) {
       next(error);
     }
   },
 
-  join(req: Request, res: Response, next: NextFunction): void {
+  async join(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userName = validateUserName(req.body);
-      const event = eventService.join(parseEventId(req.params.id), userName);
+      const event = await eventService.join(parseEventId(req.params.id), userName);
       res.status(200).json(event);
     } catch (error) {
       next(error);
     }
   },
 
-  leave(req: Request, res: Response, next: NextFunction): void {
+  async leave(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userName = validateUserName(req.body);
-      const event = eventService.leave(parseEventId(req.params.id), userName);
+      const event = await eventService.leave(parseEventId(req.params.id), userName);
       res.status(200).json(event);
     } catch (error) {
       next(error);

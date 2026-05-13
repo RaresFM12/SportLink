@@ -2,12 +2,16 @@ import type { Request, Response, NextFunction } from 'express';
 import type { SessionUser } from '../services/authService.js';
 import { securityLogService } from '../services/securityLogService.js';
 
+const IDLE_TIMEOUT_MS = Number(process.env.SESSION_IDLE_TIMEOUT_MS ?? 1000 * 60 * 15);
+
 // Extend the Express session with our user type.
 // We augment the express-session SessionData interface here so TypeScript
 // knows req.session.user exists throughout the whole app.
 declare module 'express-session' {
   interface SessionData {
     user?: SessionUser;
+    authToken?: string;
+    lastActivityAt?: number;
   }
 }
 
@@ -19,6 +23,17 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     res.status(401).json({ message: 'Not authenticated. Please log in.' });
     return;
   }
+
+  const now = Date.now();
+  if (req.session.lastActivityAt && now - req.session.lastActivityAt > IDLE_TIMEOUT_MS) {
+    req.session.destroy(() => {
+      res.status(401).json({ message: 'Session expired due to inactivity.' });
+    });
+    return;
+  }
+
+  req.session.lastActivityAt = now;
+  req.session.touch();
   next();
 }
 
