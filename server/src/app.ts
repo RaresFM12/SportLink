@@ -43,6 +43,9 @@ export const sessionMiddleware = session({
 
 export const app = express();
 
+app.set('trust proxy', 1);
+
+
 app.use(cors({
   origin: CLIENT_ORIGINS,
   credentials: true,
@@ -162,3 +165,4 @@ export async function configureApp(): Promise<typeof app> {
   app.use(errorHandler);
   return app;
 }
+
