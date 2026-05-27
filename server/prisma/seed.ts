@@ -28,7 +28,9 @@ async function main() {
     prisma.permission.create({ data: { action: 'event:read' } }),
     prisma.permission.create({ data: { action: 'event:create' } }),
     prisma.permission.create({ data: { action: 'event:update' } }),
+    prisma.permission.create({ data: { action: 'event:update:own' } }),
     prisma.permission.create({ data: { action: 'event:delete' } }),
+    prisma.permission.create({ data: { action: 'event:delete:own' } }),
     prisma.permission.create({ data: { action: 'event:join' } }),
     prisma.permission.create({ data: { action: 'event:leave' } }),
     prisma.permission.create({ data: { action: 'comment:create' } }),
@@ -58,9 +60,10 @@ async function main() {
     data: permissions.map((p) => ({ roleId: adminRole.id, permissionId: p.id })),
   });
 
-  // USER gets read + join/leave + comment + chat (no delete events, no generator, no user:manage)
+  // USER gets read, create, own-event management, join/leave, comment, and chat.
   const userPermissions = [
-    'event:read', 'event:create', 'event:join', 'event:leave',
+    'event:read', 'event:create', 'event:update:own', 'event:delete:own',
+    'event:join', 'event:leave',
     'comment:create', 'comment:update', 'comment:delete',
     'statistics:read', 'chat:read', 'chat:write',
   ];

@@ -26,6 +26,23 @@ function requirePermission(ctx: GraphQLContext, action: string): void {
   }
 }
 
+function requireAnyPermission(ctx: GraphQLContext, actions: string[]): void {
+  if (!ctx.user) {
+    throw new GraphQLError('Not authenticated.', { extensions: { code: 'UNAUTHENTICATED' } });
+  }
+
+  if (!actions.some((action) => ctx.user?.permissions.includes(action))) {
+    void securityLogService.markSuspicious(
+      ctx.user,
+      `GraphQL permission denied for one of: ${actions.join(', ')}`,
+      `GraphQL ${actions.join(' or ')}`
+    ).catch((err) => {
+      console.error('[security-log] Failed to mark GraphQL suspicious user:', err);
+    });
+    throw new GraphQLError(`Permission denied: ${actions.join(' or ')}`, { extensions: { code: 'FORBIDDEN' } });
+  }
+}
+
 function toGraphQLError(err: unknown): never {
   if (err instanceof HttpError) {
     const code =
@@ -124,7 +141,7 @@ export const resolvers = {
     },
 
     async updateEvent(_: unknown, args: { id: number; input: unknown }, ctx: GraphQLContext) {
-      requirePermission(ctx, 'event:update');
+      requireAnyPermission(ctx, ['event:update', 'event:update:own']);
       try {
         validateUpdateEventInput(args.input);
         return await eventService.update(
@@ -138,7 +155,7 @@ export const resolvers = {
     },
 
     async deleteEvent(_: unknown, args: { id: number }, ctx: GraphQLContext) {
-      requirePermission(ctx, 'event:delete');
+      requireAnyPermission(ctx, ['event:delete', 'event:delete:own']);
       try {
         await eventService.remove(args.id, ctx.user);
         return true;

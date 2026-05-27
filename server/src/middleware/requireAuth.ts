@@ -69,6 +69,28 @@ export function requirePermission(action: string) {
   };
 }
 
+export function requireAnyPermission(actions: string[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const user = req.authUser ?? req.session?.user;
+    if (!user) {
+      res.status(401).json({ message: 'Not authenticated.' });
+      return;
+    }
+    if (!actions.some((action) => user.permissions.includes(action))) {
+      void securityLogService.markSuspicious(
+        user,
+        `Permission denied for one of: ${actions.join(', ')}`,
+        `${req.method} ${req.originalUrl}`
+      ).catch((err) => {
+        console.error('[security-log] Failed to mark suspicious user:', err);
+      });
+      res.status(403).json({ message: `Permission denied: ${actions.join(' or ')}` });
+      return;
+    }
+    next();
+  };
+}
+
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   const user = req.authUser ?? req.session?.user;
   if (!user) {

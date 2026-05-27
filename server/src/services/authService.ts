@@ -20,7 +20,9 @@ const DEFAULT_PERMISSIONS = [
   'event:read',
   'event:create',
   'event:update',
+  'event:update:own',
   'event:delete',
+  'event:delete:own',
   'event:join',
   'event:leave',
   'comment:create',
@@ -37,6 +39,8 @@ const DEFAULT_PERMISSIONS = [
 const USER_PERMISSIONS = [
   'event:read',
   'event:create',
+  'event:update:own',
+  'event:delete:own',
   'event:join',
   'event:leave',
   'comment:create',
