@@ -4,8 +4,8 @@ import { createHash } from 'crypto';
 
 const prisma = new PrismaClient();
 
-const USER_COUNT = Number(process.env.GOLD_USER_COUNT ?? 600);
-const EVENT_COUNT = Number(process.env.GOLD_EVENT_COUNT ?? 2500);
+const USER_COUNT = Number(process.env.GOLD_USER_COUNT ?? 120);
+const EVENT_COUNT = Number(process.env.GOLD_EVENT_COUNT ?? 100);
 const COMMENTS_PER_EVENT = Number(process.env.GOLD_COMMENTS_PER_EVENT ?? 3);
 const PARTICIPANTS_PER_EVENT_MIN = Number(process.env.GOLD_PARTICIPANTS_PER_EVENT_MIN ?? 8);
 const PARTICIPANTS_PER_EVENT_MAX = Number(process.env.GOLD_PARTICIPANTS_PER_EVENT_MAX ?? 24);
@@ -13,6 +13,15 @@ const PARTICIPANTS_PER_EVENT_MAX = Number(process.env.GOLD_PARTICIPANTS_PER_EVEN
 const SPORTS = ['Football', 'Basketball', 'Tennis', 'Volleyball', 'Baseball', 'Running', 'Cycling'];
 const START_HOURS = ['08:00', '09:00', '10:00', '12:00', '14:00', '16:00', '18:00', '20:00'];
 const DURATIONS = ['1 hour', '1.5 hours', '2 hours', '2.5 hours', '3 hours'];
+const LOCATIONS = [
+  { city: 'Bucharest', location: 'National Arena' },
+  { city: 'Cluj-Napoca', location: 'Sports Hall Cluj' },
+  { city: 'Iasi', location: 'Copou Sports Park' },
+  { city: 'Timisoara', location: 'Bega Fitness Center' },
+  { city: 'Brasov', location: 'Tampa Outdoor Courts' },
+  { city: 'Constanta', location: 'Tomis Beach Courts' },
+  { city: 'Oradea', location: 'Crisul Arena' },
+];
 const PERMISSIONS = [
   'event:read',
   'event:create',
@@ -147,17 +156,18 @@ async function main() {
     const participants = faker.helpers.arrayElements(createdUsers, participantCount);
     const creator = faker.helpers.arrayElement(createdUsers);
     const sport = faker.helpers.arrayElement(SPORTS);
+    const venue = LOCATIONS[i % LOCATIONS.length];
 
     const event = await prisma.event.create({
       data: {
         createdByUserId: creator.id,
         title: `${sport} ${faker.helpers.arrayElement(['Match', 'Meetup', 'Training', 'Session'])}`,
         sport,
-        city: faker.location.city(),
+        city: venue.city,
         date: formatDate(faker.date.soon({ days: 90 })),
         startTime: faker.helpers.arrayElement(START_HOURS),
         duration: faker.helpers.arrayElement(DURATIONS),
-        location: `${faker.company.name()} Arena`,
+        location: venue.location,
         maxParticipants,
         description: faker.lorem.sentence(),
         participants: {
