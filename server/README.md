@@ -8,7 +8,9 @@ Express + TypeScript backend for the sports events matchmaking app.
 - Statistics endpoint
 - Server-side validation
 - Server-side pagination
-- RAM-only storage (no database, no file persistence)
+- Prisma/PostgreSQL persistence
+- Session, bearer token, and `X-Session-Id` authentication
+- Role permissions, scoped permission tokens, and password recovery
 - Tests with Vitest + Supertest
 
 ## Run locally
@@ -18,10 +20,50 @@ npm install
 npm run dev
 ```
 
-The server starts on:
+The server listens on every network interface so it is reachable on the LAN:
 
 ```bash
-http://localhost:3001
+https://0.0.0.0:3001
+```
+
+## Bronze auth / HTTPS setup
+
+Create a certificate that includes the server LAN IP, then point both apps at it:
+
+```bash
+mkdir ../certs
+mkcert -key-file ../certs/sportlink-key.pem -cert-file ../certs/sportlink-cert.pem localhost 127.0.0.1 192.168.1.134
+```
+
+In `server/.env`, set `SSL_KEY_PATH`, `SSL_CERT_PATH`, strong `SESSION_SECRET` and
+`AUTH_TOKEN_SECRET`, and include the client origin in `CLIENT_ORIGINS`.
+
+Run the backend on the server machine:
+
+```bash
+npm run dev
+```
+
+Run the client on the other machine with HTTPS and LAN URLs, for example:
+
+```bash
+$env:SSL_KEY_PATH="../certs/sportlink-key.pem"
+$env:SSL_CERT_PATH="../certs/sportlink-cert.pem"
+npm run dev -- --host 0.0.0.0
+```
+
+Login/register now return a signed bearer token plus an HTTP-only session cookie.
+The backend accepts three auth paths for lab testing: the session cookie, a signed
+`Authorization: Bearer <token>` header, or the stored `X-Session-Id` header used
+by the LAN client and WebSockets. Role permissions are checked on REST and
+GraphQL operations, scoped bearer tokens can restrict permissions further, and
+sessions expire after `SESSION_IDLE_TIMEOUT_MS` of inactivity.
+
+Apply database migrations before running after pulling auth changes:
+
+```bash
+npx prisma migrate deploy
+npx prisma generate
 ```
 
 ## Build
@@ -42,6 +84,15 @@ npm run coverage
 
 ### Health
 - `GET /api/health`
+
+### Auth
+- `POST /api/auth/login`
+- `POST /api/auth/register`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+- `POST /api/auth/tokens`
+- `POST /api/auth/password/forgot`
+- `POST /api/auth/password/reset`
 
 ### Events
 - `GET /api/events`

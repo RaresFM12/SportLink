@@ -1,7 +1,3 @@
-// This file is the single source of truth for the database schema.
-// Run `npx prisma migrate dev` to generate and apply migrations automatically.
-// Never edit the database manually.
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,23 +8,14 @@ datasource db {
 }
 
 // ─── Event ────────────────────────────────────────────────────────────────────
-// 3NF proof:
-//   - Every non-key attribute (title, sport, city, date, startTime, duration,
-//     location, maxParticipants, description) depends only on the primary key id.
-//   - No transitive dependencies: sport, city, location are stored as plain
-//     strings (denormalised for simplicity); if sport needed extra attributes
-//     (e.g. teamSize) it would be extracted to its own table — but it doesn't.
-//   - participants is extracted to its own Participant table (see below),
-//     eliminating the repeating group that existed in the in-memory model.
-//   - currentParticipants is a derived value (_count of participants) and is
-//     NOT stored — it is computed at query time to avoid update anomalies.
 model Event {
   id              Int           @id @default(autoincrement())
+  createdByUserId Int?
   title           String
   sport           String
   city            String
-  date            String        // stored as YYYY-MM-DD string to match domain type
-  startTime       String        // stored as HH:mm string
+  date            String
+  startTime       String
   duration        String
   location        String
   maxParticipants Int
@@ -38,12 +25,12 @@ model Event {
 
   participants    Participant[]
   comments        Comment[]
+  createdBy       User?         @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdByUserId])
 }
 
 // ─── Participant ──────────────────────────────────────────────────────────────
-// Extracted from the string[] on EventItem.
-// 3NF: userName depends only on (eventId, userName) — the composite PK.
-// This eliminates the repeating group and allows efficient filtering by user.
 model Participant {
   id        Int    @id @default(autoincrement())
   eventId   Int
@@ -51,13 +38,12 @@ model Participant {
 
   event     Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  @@unique([eventId, userName])  // a user can only join an event once
-  @@index([userName])            // fast lookup for joinedOnly filter
+  @@unique([eventId, userName])
+  @@index([userName])
+  @@index([userName, eventId])
 }
 
 // ─── Comment ─────────────────────────────────────────────────────────────────
-// 3NF: author, content, createdAt depend only on id.
-// eventId is the FK establishing the 1-to-many Event → Comment relationship.
 model Comment {
   id        Int      @id @default(autoincrement())
   eventId   Int
@@ -67,5 +53,125 @@ model Comment {
 
   event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  @@index([eventId])  // fast lookup for getByEventId
+  @@index([eventId])
+}
+
+// ─── Role ─────────────────────────────────────────────────────────────────────
+// 3NF: name is the only non-key attribute, depends only on id.
+// Two roles: ADMIN and USER.
+model Role {
+  id          Int              @id @default(autoincrement())
+  name        String           @unique  // 'ADMIN' | 'USER'
+  description String
+
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+}
+
+// ─── Permission ───────────────────────────────────────────────────────────────
+// 3NF: action depends only on id. No transitive deps.
+// Examples: 'event:create', 'event:delete', 'generator:start', 'user:manage'
+model Permission {
+  id     Int    @id @default(autoincrement())
+  action String @unique  // e.g. 'event:create'
+
+  rolePermissions RolePermission[]
+}
+
+// ─── RolePermission (junction: Role ↔ Permission) ────────────────────────────
+// Many-to-many resolved as an explicit junction table.
+// In 3NF: the only fact is "this role has this permission".
+model RolePermission {
+  roleId       Int
+  permissionId Int
+
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+// 3NF: username, passwordHash, displayName all depend only on id.
+// No derived or transitive attributes.
+model User {
+  id           Int        @id @default(autoincrement())
+  username     String     @unique
+  passwordHash String
+  displayName  String
+  createdAt    DateTime   @default(now())
+
+  userRoles           UserRole[]
+  actionLogs          ActionLog[]
+  observation         ObservationUser?
+  createdEvents       Event[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt])
+}
+
+// ─── UserRole (junction: User ↔ Role) ────────────────────────────────────────
+// Many-to-many, but in practice each user has exactly one role (ADMIN or USER).
+// Using a junction table keeps the schema extensible for multi-role users later.
+model UserRole {
+  userId Int
+  roleId Int
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+}
+
+// Log table for every HTTP action completed by a logged-in user.
+// GROUP_ID from the challenge is represented by the user's role name at action time.
+model ActionLog {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  groupId           String
+  actionInformation String
+  method            String
+  path              String
+  statusCode        Int
+  ipAddress         String?
+  userAgent         String?
+  metadata          Json?
+  createdAt         DateTime @default(now())
+
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([groupId, createdAt])
+  @@index([statusCode, createdAt])
+}
+
+// Admin-visible watch list populated by the suspicious-behaviour detector.
+model ObservationUser {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique
+  groupId        String
+  reason         String
+  suspicionScore Int      @default(0)
+  lastActionInfo String
+  lastActionAt   DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([suspicionScore])
+  @@index([lastActionAt])
 }

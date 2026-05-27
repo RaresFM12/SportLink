@@ -14,6 +14,7 @@ import {
 } from "../components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { useEvents } from "../context/EventsContext";
+import { useAuth } from "../context/AuthContext";
 import {
   hasValidationErrors,
   validateEventForm,
@@ -27,6 +28,7 @@ export function EditEventPage() {
 
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { selectedEvent, selectedEventLoading, fetchEventById, updateEvent } = useEvents();
 
   const eventId = Number(id);
@@ -132,6 +134,19 @@ export function EditEventPage() {
     return (
       <div className="text-center py-12">
         <p className="text-red-600">{loadError || "Event not found"}</p>
+        <Button onClick={() => navigate("/events")} className="mt-4">
+          Back to Events
+        </Button>
+      </div>
+    );
+  }
+
+  const canManageEvent = user?.role === "ADMIN" || selectedEvent.createdByUserId === user?.id;
+
+  if (!canManageEvent) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-red-600">You can only edit events created by you.</p>
         <Button onClick={() => navigate("/events")} className="mt-4">
           Back to Events
         </Button>

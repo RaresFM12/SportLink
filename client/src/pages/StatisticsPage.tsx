@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -23,8 +23,33 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { useEvents } from "../context/EventsContext";
+import { useAuth } from "../context/AuthContext";
 import { usePageTracking } from "../hooks/usePageTracking";
 import { motion } from "framer-motion";
+
+const LOCATION_CHART_LIMIT = 7;
+
+type LocationStat = {
+  location: string;
+  count: number;
+};
+
+function getTopLocations(locations: LocationStat[]): LocationStat[] {
+  const sortedLocations = [...locations].sort((a, b) => b.count - a.count);
+  const visibleLocations = sortedLocations.slice(0, LOCATION_CHART_LIMIT);
+  const hiddenLocations = sortedLocations.slice(LOCATION_CHART_LIMIT);
+  const hiddenCount = hiddenLocations.reduce((total, item) => total + item.count, 0);
+
+  if (hiddenCount === 0) return visibleLocations;
+
+  return [
+    ...visibleLocations,
+    {
+      location: "Other locations",
+      count: hiddenCount,
+    },
+  ];
+}
 
 export function StatisticsPage() {
   usePageTracking("events-statistics");
@@ -40,6 +65,15 @@ export function StatisticsPage() {
   } = useEvents();
 
   const [generatorActionLoading, setGeneratorActionLoading] = useState(false);
+  const { hasPermission } = useAuth();
+  const canControlGenerator = hasPermission("generator:start") || hasPermission("generator:stop");
+  const locationChartData = useMemo(
+    () => getTopLocations(statistics?.locations ?? []),
+    [statistics?.locations]
+  );
+  const hasGroupedLocations = statistics
+    ? locationChartData.length < statistics.locations.length
+    : false;
 
   useEffect(() => {
     fetchStatistics().catch(() => undefined);
@@ -63,7 +97,7 @@ export function StatisticsPage() {
     }
   };
 
-  const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
+  const COLORS = ["#2563eb", "#059669", "#d97706", "#dc2626", "#7c3aed", "#db2777", "#0891b2", "#6b7280"];
 
   if (statisticsLoading) {
     return <div className="py-12 text-center text-gray-600">Loading statistics...</div>;
@@ -106,21 +140,25 @@ export function StatisticsPage() {
               Generator: {generatorRunning ? "Running" : "Stopped"}
             </div>
 
-            <Button
-              onClick={() => void handleStartGenerator()}
-              disabled={generatorActionLoading || generatorRunning}
-              className="bg-green-600 text-white hover:bg-green-700"
-            >
-              Start Generator
-            </Button>
+            {canControlGenerator && (
+              <>
+                <Button
+                  onClick={() => void handleStartGenerator()}
+                  disabled={generatorActionLoading || generatorRunning}
+                  className="bg-green-600 text-white hover:bg-green-700"
+                >
+                  Start Generator
+                </Button>
 
-            <Button
-              onClick={() => void handleStopGenerator()}
-              disabled={generatorActionLoading || !generatorRunning}
-              variant="outline"
-            >
-              Stop Generator
-            </Button>
+                <Button
+                  onClick={() => void handleStopGenerator()}
+                  disabled={generatorActionLoading || !generatorRunning}
+                  variant="outline"
+                >
+                  Stop Generator
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -151,21 +189,25 @@ export function StatisticsPage() {
 
               <Card className="border-gray-200 shadow-sm">
                 <CardHeader>
-                  <CardTitle>Events by Location</CardTitle>
+                  <CardTitle>
+                    Events by Location{hasGroupedLocations ? " (Top 7)" : ""}
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="h-[350px]">
+                <CardContent className="h-[380px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={statistics.locations}
+                        data={locationChartData}
                         dataKey="count"
                         nameKey="location"
                         cx="50%"
                         cy="50%"
-                        outerRadius={110}
-                        label
+                        innerRadius={55}
+                        outerRadius={105}
+                        labelLine={false}
+                        label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
                       >
-                        {statistics.locations.map((entry, index) => (
+                        {locationChartData.map((entry, index) => (
                           <Cell key={entry.location} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>

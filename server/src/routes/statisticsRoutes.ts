@@ -1,6 +1,13 @@
 import { Router } from 'express';
 import { statisticsController } from '../controllers/statisticsController.js';
+import { requireAuth, requirePermission } from '../middleware/requireAuth.js';
 
 export const statisticsRoutes = Router();
 
-statisticsRoutes.get('/', statisticsController.get);
+statisticsRoutes.get('/', requireAuth, requirePermission('statistics:read'), statisticsController.get);
+statisticsRoutes.get(
+  '/co-participation',
+  requireAuth,
+  requirePermission('statistics:read'),
+  statisticsController.coParticipation
+);

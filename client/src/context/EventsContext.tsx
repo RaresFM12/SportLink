@@ -18,6 +18,8 @@ import {
   type StatisticsData,
   type UpdateEventInput,
 } from "../services/eventService";
+import { wsUrl } from "../config/backend";
+import { useAuth } from "./AuthContext";
 import { offlineEvents } from "../services/offlineEvents";
 import { isServerReachable, syncPendingOperations } from "../services/syncService";
 
@@ -54,6 +56,7 @@ type EventsContextValue = {
 const EventsContext = createContext<EventsContextValue | undefined>(undefined);
 
 export function EventsProvider({ children }: { children: ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
   const initialOfflineItems = offlineEvents.getEvents();
 
   const [events, setEvents] = useState<EventItem[]>(initialOfflineItems);
@@ -504,15 +507,19 @@ export function EventsProvider({ children }: { children: ReactNode }) {
   // ── effects ──────────────────────────────────────────────────────────────
 
   useEffect(() => {
+    if (authLoading || !user) return;
+
     fetchEvents({ page: 1, limit: 10 }).catch(() => undefined);
     fetchStatistics().catch(() => undefined);
     eventService
       .getGeneratorStatus()
       .then((s) => setGeneratorRunning(s.running))
       .catch(() => undefined);
-  }, [fetchEvents, fetchStatistics]);
+  }, [authLoading, fetchEvents, fetchStatistics, user]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
+
     const handleOnline = () => void trySyncNow();
     const handleOffline = () => {
       setIsOfflineMode(true);
@@ -524,15 +531,19 @@ export function EventsProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, [trySyncNow]);
+  }, [authLoading, trySyncNow, user]);
 
   useEffect(() => {
+    if (authLoading || !user) return;
+
     const id = window.setInterval(() => void trySyncNow(), 3000);
     return () => window.clearInterval(id);
-  }, [trySyncNow]);
+  }, [authLoading, trySyncNow, user]);
 
   useEffect(() => {
-    const socket = new WebSocket(import.meta.env.VITE_SOCKET_URL);
+    if (authLoading || !user) return;
+
+    const socket = new WebSocket(wsUrl("/ws"));
 
     socket.onmessage = (ev) => {
       try {
@@ -560,7 +571,7 @@ export function EventsProvider({ children }: { children: ReactNode }) {
     // fetchEvents/fetchStatistics are stable callbacks — intentionally omitted
     // from deps to avoid recreating the socket on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authLoading, user]);
 
   // ── context value ────────────────────────────────────────────────────────
 

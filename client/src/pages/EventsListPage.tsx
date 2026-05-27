@@ -31,13 +31,14 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import { useEvents } from "../context/EventsContext";
+import { useAuth } from "../context/AuthContext";
+import { eventService } from "../services/eventService";
 import { useVisitTracking } from "../hooks/useVisitTracking";
 import { usePageTracking } from "../hooks/usePageTracking";
 import { useInfiniteScroll } from "../hooks/useInfiniteScroll";
 import { savePreferredSport, getPreferredSport } from "../utils/activityTracking";
 import { motion } from "framer-motion";
 
-const CURRENT_USER = "Rares";
 const PAGE_LIMIT = 10;
 const LOCATION_DEBOUNCE_MS = 350;
 
@@ -47,7 +48,10 @@ export function EventsListPage() {
 
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isMyEvents = location.pathname === "/my-events";
+  const canManageEvent = (event: { createdByUserId?: number | null }) =>
+    user?.role === "ADMIN" || event.createdByUserId === user?.id;
 
   const {
     events,
@@ -66,6 +70,7 @@ export function EventsListPage() {
   const [date, setDate] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
   const [deleteEventId, setDeleteEventId] = useState<number | null>(null);
+  const [securityMessage, setSecurityMessage] = useState("");
 
   // Keep a ref to the latest filter values so effects and callbacks always
   // read the current values without creating new function references.
@@ -92,8 +97,7 @@ export function EventsListPage() {
       sport: f.sport,
       date: f.date,
       location: f.location,
-      joinedOnly: f.isMyEvents,
-      user: f.isMyEvents ? CURRENT_USER : undefined,
+      createdByUserId: f.isMyEvents ? user?.id : undefined,
     }).catch(() => undefined);
   };
 
@@ -157,6 +161,32 @@ export function EventsListPage() {
     }
   };
 
+  const handleRestrictedEditAttempt = async (event: { id: number; title: string }) => {
+    try {
+      setSecurityMessage("");
+      await eventService.update(event.id, { title: event.title });
+    } catch (err) {
+      setSecurityMessage(
+        err instanceof Error
+          ? `${err.message} This attempt was logged for security monitoring.`
+          : "This restricted edit attempt was logged for security monitoring."
+      );
+    }
+  };
+
+  const handleRestrictedDeleteAttempt = async (eventId: number) => {
+    try {
+      setSecurityMessage("");
+      await eventService.remove(eventId);
+    } catch (err) {
+      setSecurityMessage(
+        err instanceof Error
+          ? `${err.message} This attempt was logged for security monitoring.`
+          : "This restricted attempt was logged for security monitoring."
+      );
+    }
+  };
+
   // ── render ────────────────────────────────────────────────────────────
   return (
     <motion.div
@@ -167,7 +197,7 @@ export function EventsListPage() {
     >
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">
-          {isMyEvents ? "My Events" : "All Events"}
+          {isMyEvents ? "My Created Events" : "All Events"}
         </h1>
 
         <Link
@@ -185,6 +215,12 @@ export function EventsListPage() {
           {pendingOperationsCount > 0
             ? ` ${pendingOperationsCount} change(s) will sync when the connection is restored.`
             : " Local data is being shown."}
+        </div>
+      )}
+
+      {securityMessage && (
+        <div className="rounded-md border border-purple-300 bg-purple-50 px-4 py-3 text-purple-800">
+          {securityMessage}
         </div>
       )}
 
@@ -240,7 +276,7 @@ export function EventsListPage() {
       <Card className="border-gray-200 shadow-sm">
         <CardHeader>
           <CardTitle className="font-bold">
-            {isMyEvents ? "Joined Events" : "Events"}
+            {isMyEvents ? "Events Created By You" : "Events"}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -295,16 +331,40 @@ export function EventsListPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => navigate(`/events/${event.id}/edit`)}
-                          className="transition-all duration-200 hover:scale-[1.02] hover:bg-gray-100 hover:shadow-md"
+                          aria-disabled={!canManageEvent(event)}
+                          title={
+                            canManageEvent(event)
+                              ? "Edit event"
+                              : "Restricted: clicking will be logged as a suspicious attempt"
+                          }
+                          onClick={() =>
+                            canManageEvent(event)
+                              ? navigate(`/events/${event.id}/edit`)
+                              : void handleRestrictedEditAttempt(event)
+                          }
+                          className={`transition-all duration-200 hover:scale-[1.02] hover:bg-gray-100 hover:shadow-md ${
+                            canManageEvent(event) ? "" : "opacity-40 grayscale"
+                          }`}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => setDeleteEventId(event.id)}
-                          className="transition-all duration-200 hover:scale-[1.02] hover:bg-gray-100 hover:shadow-md"
+                          aria-disabled={!canManageEvent(event)}
+                          title={
+                            canManageEvent(event)
+                              ? "Delete event"
+                              : "Restricted: clicking will be logged as a suspicious attempt"
+                          }
+                          onClick={() =>
+                            canManageEvent(event)
+                              ? setDeleteEventId(event.id)
+                              : void handleRestrictedDeleteAttempt(event.id)
+                          }
+                          className={`transition-all duration-200 hover:scale-[1.02] hover:bg-gray-100 hover:shadow-md ${
+                            canManageEvent(event) ? "" : "opacity-40 grayscale"
+                          }`}
                         >
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>
@@ -352,6 +412,7 @@ export function EventsListPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </motion.div>
   );
 }

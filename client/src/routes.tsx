@@ -8,6 +8,7 @@ import { EventDetailsSophisticatedPage } from './pages/EventDetailPage.tsx';
 import { StatisticsPage } from './pages/StatisticsPage.tsx';
 import { RegisterPage } from './pages/RegisterPage.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
+import { PasswordRecoveryPage } from './pages/PasswordRecoveryPage.tsx';
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +22,10 @@ export const router = createBrowserRouter([
   {
     path: "login",
     element: <LoginPage/>
+  },
+  {
+    path: "password-recovery",
+    element: <PasswordRecoveryPage />
   },
   {
     path: "/",
