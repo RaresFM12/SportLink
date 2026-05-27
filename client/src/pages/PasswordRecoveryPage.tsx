@@ -22,36 +22,11 @@ type ResetResponse = {
 export function PasswordRecoveryPage() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
-  const [resetToken, setResetToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const requestReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setMessage("");
-    setLoading(true);
-
-    try {
-      const res = await fetch(`${API_BASE_URL}/auth/password/forgot`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ username: username.trim() }),
-      });
-      const data = (await res.json()) as ResetResponse;
-      if (!res.ok) throw new Error(data.message ?? "Could not create reset token.");
-      if (data.resetToken) setResetToken(data.resetToken);
-      setMessage(data.resetToken ? "Reset token generated." : data.message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create reset token.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const resetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,11 +40,27 @@ export function PasswordRecoveryPage() {
 
     setLoading(true);
     try {
+      const resetRequest = await fetch(`${API_BASE_URL}/auth/password/forgot`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ username: username.trim() }),
+      });
+      const resetData = (await resetRequest.json()) as ResetResponse;
+      if (!resetRequest.ok) {
+        throw new Error(resetData.message ?? "Could not start password reset.");
+      }
+
+      if (!resetData.resetToken) {
+        setMessage(resetData.message);
+        return;
+      }
+
       const res = await fetch(`${API_BASE_URL}/auth/password/reset`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ token: resetToken.trim(), password }),
+        body: JSON.stringify({ token: resetData.resetToken, password }),
       });
       const data = (await res.json()) as { message?: string };
       if (!res.ok) throw new Error(data.message ?? "Could not reset password.");
@@ -89,7 +80,7 @@ export function PasswordRecoveryPage() {
             <img src={logo} alt="SportLink Logo" className="h-20 w-20 object-contain" />
           </div>
           <CardTitle className="text-3xl">Recover Password</CardTitle>
-          <CardDescription>Generate a reset token and choose a new password</CardDescription>
+          <CardDescription>Choose a new password for your account</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
@@ -104,7 +95,7 @@ export function PasswordRecoveryPage() {
             </div>
           )}
 
-          <form onSubmit={(e) => void requestReset(e)} className="space-y-4">
+          <form onSubmit={(e) => void resetPassword(e)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
               <Input
@@ -112,26 +103,6 @@ export function PasswordRecoveryPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                required
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={loading || !username}
-              className="w-full bg-blue-600 text-white hover:bg-blue-700"
-            >
-              {loading ? "Generating..." : "Generate reset token"}
-            </Button>
-          </form>
-
-          <form onSubmit={(e) => void resetPassword(e)} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="resetToken">Reset token</Label>
-              <Input
-                id="resetToken"
-                type="text"
-                value={resetToken}
-                onChange={(e) => setResetToken(e.target.value)}
                 required
               />
             </div>
@@ -157,7 +128,7 @@ export function PasswordRecoveryPage() {
             </div>
             <Button
               type="submit"
-              disabled={loading || !resetToken || !password || !confirmPassword}
+              disabled={loading || !username || !password || !confirmPassword}
               className="w-full bg-blue-600 text-white hover:bg-blue-700"
             >
               {loading ? "Resetting..." : "Reset password"}

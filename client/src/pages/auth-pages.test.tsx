@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginPage } from "./LoginPage";
+import { PasswordRecoveryPage } from "./PasswordRecoveryPage";
 import { RegisterPage } from "./RegisterPage";
 
 const authMock = {
@@ -32,6 +33,7 @@ describe("auth pages", () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
   });
 
   it("submits login credentials through the auth context", async () => {
@@ -90,6 +92,35 @@ describe("auth pages", () => {
         displayName: "New User",
         password: "secret123",
       });
+    });
+  });
+
+  it("resets password with one submit action", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ message: "Reset token generated.", resetToken: "demo-token" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ message: "Password reset successfully." }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPage(<PasswordRecoveryPage />);
+
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: "rares" } });
+    fireEvent.change(screen.getByLabelText(/^new password$/i), { target: { value: "newpass123" } });
+    fireEvent.change(screen.getByLabelText(/confirm new password/i), { target: { value: "newpass123" } });
+    fireEvent.click(screen.getByRole("button", { name: /reset password/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+    expect(fetchMock.mock.calls[0][0]).toContain("/auth/password/forgot");
+    expect(fetchMock.mock.calls[1][0]).toContain("/auth/password/reset");
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({
+      body: JSON.stringify({ token: "demo-token", password: "newpass123" }),
     });
   });
 });
